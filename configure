@@ -349,7 +349,6 @@ if 'CXX_ARGS' in os.environ.keys(): cxx_args = shlex.split (os.environ['CXX_ARGS
 if 'LD' in os.environ.keys(): ld = shlex.split (os.environ['LD'])
 if 'LDLIB' in os.environ.keys(): ld_lib = shlex.split (os.environ['LDLIB'])
 
-
 cpp = cxx + cxx_args
 
 report ('Checking C++ compiler [' + cpp[0] + ']: ')
