@@ -38,3 +38,9 @@ scripts/.RData
 *.creator.user
 *.files
 *.includes
+mrtrix3.config
+mrtrix3.creator
+mrtrix3.creator.user
+mrtrix3.files
+mrtrix3.includes
+*.dylib
