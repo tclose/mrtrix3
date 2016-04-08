@@ -16,6 +16,7 @@
 *.img
 *.hdr
 *.qrc
+*.rste
 icons.cpp
 /config.*
 /configure.log
@@ -24,15 +25,14 @@ icons.cpp
 /lib/version.cpp
 /src/project_version.h
 /test/src/project_version.h
-/bin/
+/scripts/mrtrix_bash_completion
+/release/
 /test/bin/
 /dev/
 .cproject
 .project
 .settings
 .pydevproject
-scripts/.Rhistory
-scripts/.RData
 *.config
 *.creator
 *.creator.user
@@ -44,3 +44,10 @@ mrtrix3.creator.user
 mrtrix3.files
 mrtrix3.includes
 *.dylib
+/debug/
+testing.log
+testing/build.log
+testing/release/
+testing/src/
+.__tmp.log
+/bin

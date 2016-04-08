@@ -1,23 +1,16 @@
 /*
-   Copyright 2009 Brain Research Institute, Melbourne, Australia
-
-   Written by J-Donald Tournier, 14/10/09.
-
-   This file is part of MRtrix.
-
-   MRtrix is free software: you can redistribute it and/or modify
-   it under the terms of the GNU General Public License as published by
-   the Free Software Foundation, either version 3 of the License, or
-   (at your option) any later version.
-
-   MRtrix is distributed in the hope that it will be useful,
-   but WITHOUT ANY WARRANTY; without even the implied warranty of
-   MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
-   GNU General Public License for more details.
-
-   You should have received a copy of the GNU General Public License
-   along with MRtrix.  If not, see <http://www.gnu.org/licenses/>.
-
+ * Copyright (c) 2008-2016 the MRtrix3 contributors
+ * 
+ * This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at http://mozilla.org/MPL/2.0/
+ * 
+ * MRtrix is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ * 
+ * For more details, see www.mrtrix.org
+ * 
  */
 
 #ifndef __mrtrix_thread_h__
@@ -28,23 +21,35 @@
 #include <mutex>
 
 #include "debug.h"
+#include "mrtrix.h"
 #include "exception.h"
 
-/** \defgroup Thread Multi-threading
+/** \defgroup thread_classes Multi-threading
  * \brief functions to provide support for multi-threading
  *
- * These functions and class provide a simple interface for multi-threading in
- * MRtrix applications. Most of the low-level funtionality is a thin wrapper on
- * top to POSIX threads. There are two classes that are MRtrix-specific: 
- * \ref thread_queue, and \ref image_thread_looping. These two APIs provide
- * simple and convenient ways of multi-threading, and should be sufficient for
- * the vast majority of applications.
+ * These functions and associated classes provide a simple interface for
+ * multi-threading in MRtrix applications. Most of the low-level funtionality
+ * relies on the C++11 `std::thread` API. MRtrix3 builds on this to add three
+ * convenience methods: 
+ * 
+ * - [Thread::run()](@ref Thread::run()) to launch one or more worker threads;
+ *
+ * - [ThreadedLoop()](@ref image_thread_looping) to run an operation over all voxels
+ *   in one or more images;
+ *
+ * - [Thread::run_queue()](@ref Thread::run_queue()) to run a pipeline,
+ *   with one or more threads feeding data through to one or more other threads
+ *   (potentially with further stages in the pipeline).
+ *
+ * These APIs provide simple and convenient ways of multi-threading, and should
+ * be sufficient for the vast majority of applications.
  *
  * Please refer to the \ref multithreading page for an overview of
  * multi-threading in MRtrix.
  *
- * \sa Image::ThreadedLoop
- * \sa thread_run_queue
+ * \sa Thread::run()
+ * \sa threaded_loop
+ * \sa Thread::run_queue()
  */
 
 namespace MR
@@ -218,14 +223,14 @@ namespace MR
 
 
 
-    /** \addtogroup Thread
+    /** \addtogroup thread_classes
      * @{ */
 
     /** \defgroup thread_basics Basic multi-threading primitives
      * \brief basic functions and classes to allow multi-threading
      *
      * These functions and classes mostly provide a thin wrapper around the
-     * POSIX threads API. While they can be used as-is to develop
+     * C++11 threads API. While they can be used as-is to develop
      * multi-threaded applications, in practice the \ref image_thread_looping
      * and \ref thread_queue APIs provide much more convenient and powerful
      * ways of developing robust and efficient applications.
@@ -244,6 +249,7 @@ namespace MR
      * Thread::run_queue to request that the functor \a object be run in
      * parallel using \a number threads of execution (defaults to
      * Thread::number_of_threads()). 
+     * \sa Thread::run() 
      * \sa Thread::run_queue() */
     template <class Functor>
       inline __Multi<typename std::remove_reference<Functor>::type> 
@@ -327,6 +333,7 @@ namespace MR
      * Thread::run(), rather than relying on the destructor alone (note
      * Thread::Queue already does this). 
      *
+     * \sa Thread::multi()
      */
     template <class Functor>
       inline typename __run<Functor>::type run (Functor&& functor, const std::string& name = "unnamed") 
