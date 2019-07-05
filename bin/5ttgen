@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Script that generates a five-tissue-type (5TT) segmented image: the format appropriate for ACT
 #
