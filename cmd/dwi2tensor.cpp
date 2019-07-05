@@ -1,20 +1,20 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
 
 
 #include "command.h"
+#include "phase_encoding.h"
 #include "progressbar.h"
 #include "image.h"
 #include "algo/threaded_copy.h"
@@ -23,10 +23,20 @@
 
 using namespace MR;
 using namespace App;
-using namespace std;
 
-typedef float value_type;
-const int default_iter = 2;
+using value_type = float;
+
+#define DEFAULT_NITER 2
+
+const char* encoding_description =
+  "The tensor coefficients are stored in the output image as follows: \n"
+  "volumes 0-5: D11, D22, D33, D12, D13, D23 ; \n\n"
+  "If diffusion kurtosis is estimated using the -dkt option, these are stored as follows: \n"
+  "volumes 0-2: W1111, W2222, W3333 ; \n"
+  "volumes 3-8: W1112, W1113, W1222, W1333, W2223, W2333 ; \n"
+  "volumes 9-11: W1122, W1133, W2233 ; \n"
+  "volumes 12-14: W1123, W1223, W1233 ;";
+
 
 void usage ()
 {
@@ -47,21 +57,23 @@ void usage ()
   + Argument ("image").type_image_out()
   + Option ("dkt", "the output dkt image.")
   + Argument ("image").type_image_out()
-  + Option ("iter","number of iterative reweightings (default: 2); set to 0 for ordinary linear least squares.")
-  + Argument ("integer").type_integer (0, default_iter, 10)
+  + Option ("iter","number of iterative reweightings (default: " + str(DEFAULT_NITER) + "); set to 0 for ordinary linear least squares.")
+  + Argument ("integer").type_integer (0, 10)
   + Option ("predicted_signal", "the predicted dwi image.")
   + Argument ("image").type_image_out()
   + DWI::GradImportOptions();
   
   AUTHOR = "Ben Jeurissen (ben.jeurissen@uantwerpen.be)";
   
+  SYNOPSIS = "Diffusion (kurtosis) tensor estimation using iteratively reweighted linear least squares estimator";
+
   DESCRIPTION
-  + "Diffusion (kurtosis) tensor estimation using iteratively reweighted linear least squares estimator.";
+  + encoding_description;
+
 }
 
 template <class MASKType, class B0Type, class DKTType, class PredictType>
-class Processor
-{
+class Processor { MEMALIGN(Processor)
   public:
     Processor (const Eigen::MatrixXd& b, const int iter, MASKType* mask_image, B0Type* b0_image, DKTType* dkt_image, PredictType* predict_image) :
       mask_image (mask_image),
@@ -102,9 +114,9 @@ class Processor
           w = (b*p).array().exp();
           work.setZero();
           work.selfadjointView<Eigen::Lower>().rankUpdate (b.transpose()*w.asDiagonal());
-          p = llt.compute (work.selfadjointView<Eigen::Lower>()).solve(b.transpose()*w.asDiagonal()*dwi);
+          p = llt.compute (work.selfadjointView<Eigen::Lower>()).solve(b.transpose()*w.asDiagonal()*w.asDiagonal()*dwi);
         }
-             
+        
         if (b0_image) {
           assign_pos_of (dwi_image, 0, 3).to (*b0_image);
           b0_image->value() = exp(p[6]);
@@ -163,11 +175,13 @@ void run ()
     check_dimensions (dwi, *mask, 0, 3);
   }
   
-  auto iter = get_option_value ("iter", default_iter);
+  auto iter = get_option_value ("iter", DEFAULT_NITER);
 
   Header header (dwi);
   header.datatype() = DataType::Float32;
-  header.set_ndim (4);
+  header.ndim() = 4;
+  DWI::stash_DW_scheme (header, grad);
+  PhaseEncoding::clear_scheme (header);
   
   Image<value_type>* predict = nullptr;
   opt = get_options ("predicted_signal");
@@ -181,14 +195,14 @@ void run ()
   Image<value_type>* b0 = nullptr;
   opt = get_options ("b0");
   if (opt.size()) {
-    header.set_ndim (3);
+    header.ndim() = 3;
     b0 = new Image<value_type> (Image<value_type>::create (opt[0][0], header));
   }
 
   Image<value_type>* dkt = nullptr;
   opt = get_options ("dkt");
   if (opt.size()) {
-    header.set_ndim (4);
+    header.ndim() = 4;
     header.size(3) = 15;
     dkt = new Image<value_type> (Image<value_type>::create (opt[0][0], header));
   }

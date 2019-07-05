@@ -1,16 +1,15 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
 
 
@@ -43,11 +42,11 @@ namespace MR
     {
 
       class Renderer
-      {
+      { MEMALIGN(Renderer)
 
-          typedef Eigen::MatrixXf matrix_t;
-          typedef Eigen::VectorXf vector_t;
-          typedef Eigen::Matrix3f tensor_t;
+          using matrix_t = Eigen::MatrixXf;
+          using vector_t = Eigen::VectorXf;
+          using tensor_t = Eigen::Matrix3f;
 
         public:
 
@@ -99,7 +98,7 @@ namespace MR
           float object_color[3];
           mutable GLuint reverse_ID, origin_ID;
 
-          class Shader : public GL::Shader::Program {
+          class Shader : public GL::Shader::Program { MEMALIGN(Shader)
             public:
               Shader () : mode_ (mode_t::SH), use_lighting_ (true), colour_by_direction_ (true), hide_neg_values_ (true), orthographic_ (false) { }
               void start (mode_t mode, bool use_lighting, bool colour_by_direction, bool hide_neg_values, bool orthographic);
@@ -119,7 +118,7 @@ namespace MR
 
         private:
           class ModeBase
-          {
+          { NOMEMALIGN
             public:
               ModeBase (Renderer& parent) : parent (parent) { }
               virtual ~ModeBase() { }
@@ -135,9 +134,9 @@ namespace MR
 
         public:
           class SH : public ModeBase
-          {
+          { MEMALIGN(SH)
             public:
-              SH (Renderer& parent) : ModeBase (parent) { }
+              SH (Renderer& parent) : ModeBase (parent), LOD (0) { }
               ~SH();
 
               void initGL() override;
@@ -145,7 +144,7 @@ namespace MR
               void set_data (const vector_t& r_del_daz, int buffer_ID = 0) const override;
               GLuint num_indices() const override { return half_sphere.num_indices; }
 
-              void update_mesh (const size_t LOD, const int lmax);
+              void update_mesh (const size_t, const int);
 
               void compute_r_del_daz (matrix_t& r_del_daz, const matrix_t& SH) const {
                 if (!SH.rows() || !SH.cols()) return;
@@ -159,21 +158,24 @@ namespace MR
                 r_del_daz.noalias() = transform * SH;
               }
 
+              int get_LOD() const { return LOD; }
+
             private:
+              int LOD;
               matrix_t transform;
               Shapes::HalfSphere half_sphere;
               GL::VertexBuffer surface_buffer;
               GL::VertexArrayObject VAO;
 
-              void update_transform (const std::vector<Shapes::HalfSphere::Vertex>&, int);
+              void update_transform (const vector<Shapes::HalfSphere::Vertex>&, int);
 
           } sh;
 
 
           class Tensor : public ModeBase
-          {
+          { MEMALIGN(Tensor)
             public:
-              Tensor (Renderer& parent) : ModeBase (parent) { }
+              Tensor (Renderer& parent) : ModeBase (parent), LOD (0) { }
               ~Tensor();
 
               void initGL() override;
@@ -181,9 +183,12 @@ namespace MR
               void set_data (const vector_t& data, int buffer_ID = 0) const override;
               GLuint num_indices() const override { return half_sphere.num_indices; }
 
-              void update_mesh (const size_t LOD);
+              void update_mesh (const size_t);
+
+              int get_LOD() const { return LOD; }
 
             private:
+              int LOD;
               Shapes::HalfSphere half_sphere;
               GL::VertexArrayObject VAO;
 
@@ -193,8 +198,10 @@ namespace MR
 
 
           class Dixel : public ModeBase
-          {
-              typedef MR::DWI::Directions::dir_t dir_t;
+          { MEMALIGN (Dixel)
+
+              using dir_t = MR::DWI::Directions::index_type;
+
             public:
               Dixel (Renderer& parent) :
                   ModeBase (parent),
@@ -221,7 +228,7 @@ namespace MR
 
         private:
           class GrabContext : public Context::Grab
-          {
+          { NOMEMALIGN
             public:
               GrabContext (QGLWidget* context) :
                   Context::Grab (context) { }

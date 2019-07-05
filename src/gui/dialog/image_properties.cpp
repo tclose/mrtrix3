@@ -1,21 +1,22 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
+
 
 #include "header.h"
 #include "stride.h"
 #include "math/math.h"
+#include "dwi/gradient.h"
 #include "gui/dialog/file.h"
 #include "gui/dialog/list.h"
 #include "gui/dialog/image_properties.h"
@@ -88,9 +89,9 @@ namespace MR
           transform->appendChild (new TreeItem (std::string(), ss.str(), transform));
         }
 
-        auto DW_scheme = H.parse_DW_scheme();
+        auto DW_scheme = DWI::parse_DW_scheme (H);
         if (DW_scheme.rows()) {
-          if (DW_scheme.cols() != 4) {
+          if (DW_scheme.cols() < 4) {
             root->appendChild (new TreeItem ("Diffusion scheme", "(invalid)", root));
           }
           else {
@@ -137,7 +138,7 @@ namespace MR
         std::string text = k.data().toString().toUtf8().constData();
 
         if (text == "Transform") save_data = H.transform().matrix();
-        else if (text == "Diffusion scheme") save_data = H.parse_DW_scheme();
+        else if (text == "Diffusion scheme") save_data = DWI::parse_DW_scheme (H);
         else {
           save_data.resize (0, 0);
           return;

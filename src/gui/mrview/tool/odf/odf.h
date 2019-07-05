@@ -1,23 +1,24 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
+
 
 #ifndef __gui_mrview_tool_odf_odf_h__
 #define __gui_mrview_tool_odf_odf_h__
 
 #include "gui/color_button.h"
 #include "gui/mrview/tool/base.h"
+#include "gui/mrview/tool/odf/type.h"
 #include "gui/mrview/adjust_button.h"
 #include "gui/mrview/spin_box.h"
 
@@ -43,7 +44,7 @@ namespace MR
         class ODF_Preview;
 
         class ODF : public Base
-        {
+        { MEMALIGN(ODF)
             Q_OBJECT
 
           public:
@@ -57,14 +58,14 @@ namespace MR
             virtual bool process_commandline_option (const MR::App::ParsedOption& opt) override;
 
           private slots:
-            void onWindowChange ();
             void onPreviewClosed ();
-            void image_open_slot ();
+            void sh_open_slot ();
+            void tensor_open_slot ();
+            void dixel_open_slot ();
             void image_close_slot ();
             void show_preview_slot ();
             void hide_all_slot ();
             void selection_changed_slot (const QItemSelection &, const QItemSelection &);
-            void mode_change_slot();
             void lmax_slot (int);
             void dirs_slot();
             void shell_slot();
@@ -87,7 +88,6 @@ namespace MR
              ODF_Model* image_list_model;
              QListView* image_list_view;
              QPushButton *show_preview_button, *hide_all_button;
-             QComboBox *type_selector;
              QLabel *lmax_label, *level_of_detail_label;
              SpinBox *lmax_selector, *level_of_detail_selector;
              QLabel *dirs_label, *shell_label;
@@ -101,15 +101,14 @@ namespace MR
              LightingDock *lighting_dock;
              GL::Lighting* lighting;
 
-             int lmax, level_of_detail;
+             int lmax;
              
-             void add_images (std::vector<std::string>& list);
+             void add_images (vector<std::string>& list, const odf_type_t mode);
 
-             virtual void showEvent (QShowEvent* event) override;
              virtual void closeEvent (QCloseEvent* event) override;
 
              ODF_Item* get_image ();
-             void get_values (Eigen::VectorXf& SH, MRView::Image& image, const Eigen::Vector3f& pos, const bool interp);
+             void get_values (Eigen::VectorXf&, ODF_Item&, const Eigen::Vector3f&, const bool);
              void setup_ODFtype_UI (const ODF_Item*);
 
              friend class ODF_Preview;

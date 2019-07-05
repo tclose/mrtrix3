@@ -1,18 +1,16 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
-
 
 
 #ifndef __dwi_tractography_connectome_connectome_h__
@@ -38,24 +36,20 @@ namespace Connectome {
 #define TCK2NODES_FORWARDSEARCH_DEFAULT_DIST 3.0
 
 
-typedef MR::Connectome::node_t node_t;
-typedef std::pair<node_t, node_t> NodePair;
+using node_t = MR::Connectome::node_t;
+using NodePair = std::pair<node_t, node_t>;
 
 class Tck2nodes_base;
-class Metric_base;
+class Metric;
 
 
 
-extern const char* metrics[];
 extern const char* modes[];
-
-
-
-extern const App::OptionGroup AssignmentOption;
+extern const App::OptionGroup AssignmentOptions;
 Tck2nodes_base* load_assignment_mode (Image<node_t>&);
 
-extern const App::OptionGroup MetricOption;
-Metric_base* load_metric (Image<node_t>&);
+extern const App::OptionGroup MetricOptions;
+void setup_metric (Metric&, Image<node_t>&);
 
 
 

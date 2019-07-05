@@ -1,27 +1,27 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
+
 
 #ifndef __dwi_tractography_editing_worker_h__
 #define __dwi_tractography_editing_worker_h__
 
 
 #include <string>
-#include <vector>
+
+#include "types.h"
 
 #include "dwi/tractography/properties.h"
-#include "dwi/tractography/resample.h"
 #include "dwi/tractography/streamline.h"
 
 
@@ -35,13 +35,11 @@ namespace MR {
 
 
         class Worker
-        {
+        { MEMALIGN(Worker)
 
           public:
-            Worker (Tractography::Properties& p, const size_t upsample_ratio, const size_t downsample_ratio, const bool inv, const bool end) :
+            Worker (Tractography::Properties& p, const bool inv, const bool end) :
               properties (p),
-              upsampler (upsample_ratio),
-              downsampler (downsample_ratio),
               inverse (inv),
               ends_only (end),
               thresholds (p),
@@ -49,25 +47,21 @@ namespace MR {
 
             Worker (const Worker& that) :
               properties (that.properties),
-              upsampler (that.upsampler),
-              downsampler (that.downsampler),
               inverse (that.inverse),
               ends_only (that.ends_only),
               thresholds (that.thresholds),
               include_visited (properties.include.size(), false) { }
 
 
-            bool operator() (const Streamline<>&, Streamline<>&) const;
+            bool operator() (Streamline<>&, Streamline<>&) const;
 
 
           private:
             const Tractography::Properties& properties;
-            Upsampler upsampler;
-            Downsampler downsampler;
             const bool inverse, ends_only;
 
             class Thresholds
-            {
+            { NOMEMALIGN
               public:
                 Thresholds (Tractography::Properties&);
                 Thresholds (const Thresholds&);
@@ -78,7 +72,7 @@ namespace MR {
                 float step_size;
             } thresholds;
 
-            mutable std::vector<bool> include_visited;
+            mutable vector<bool> include_visited;
 
         };
 

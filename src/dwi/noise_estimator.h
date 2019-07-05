@@ -1,17 +1,17 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
+
 
 #ifndef __dwi_noise_estimator_h__
 #define __dwi_noise_estimator_h__
@@ -20,7 +20,7 @@
 #include "dwi/gradient.h"
 #include "math/least_squares.h"
 #include "math/SH.h"
-#include "dwi/Sn_scale_estimator.h"
+#include "math/Sn_scale_estimator.h"
 
 
 namespace MR {
@@ -29,7 +29,7 @@ namespace MR {
     namespace {
 
       template <class InputImageType, class OutputImageType, class MatrixType>
-        class NoiseEstimatorFunctor {
+        class NoiseEstimatorFunctor { MEMALIGN(NoiseEstimatorFunctor<InputImageType,OutputImageType,MatrixType>)
           public:
 
             NoiseEstimatorFunctor (const MatrixType& SH2amp_mapping, int axis, InputImageType& dwi, OutputImageType& noise) :
@@ -50,7 +50,7 @@ namespace MR {
                 for (auto l2 = Loop (3) (dwi); l2; ++l2) 
                   S(dwi.index(3), dwi.index(axis)) = dwi.value();
 
-              R.noalias() = H.selfadjointView<Lower>() * S - S;
+              R.noalias() = H.selfadjointView<Eigen::Lower>() * S - S;
 
               for (auto l = Loop (axis) (noise); l; ++l) {
                 R.col (noise.index (axis)).array() *= leverage.array();
@@ -63,7 +63,7 @@ namespace MR {
             OutputImageType noise;
             Eigen::MatrixXd H, S, R;
             Eigen::VectorXd leverage;
-            Sn_scale_estimator<default_type> scale_estimator;
+            Math::Sn_scale_estimator<default_type> scale_estimator;
             int axis;
         };
     }

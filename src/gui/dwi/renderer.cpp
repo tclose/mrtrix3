@@ -1,17 +1,17 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
+
 
 #include <map>
 
@@ -51,7 +51,7 @@ namespace MR
 
 
 
-      void Renderer::start (const Projection& projection, const GL::Lighting& lighting, float scale, 
+      void Renderer::start (const Projection& projection, const GL::Lighting& lighting, float scale,
           bool use_lighting, bool colour_by_direction, bool hide_neg_values, bool orthographic)
       {
         switch (mode) {
@@ -141,6 +141,7 @@ namespace MR
 
         if (mode_ == mode_t::TENSOR) {
           source +=
+          "uniform mat3 tensor;\n"
           "uniform mat3 inv_tensor;\n"
           "uniform vec3 dec;\n";
         }
@@ -158,18 +159,19 @@ namespace MR
         }
 
         source +=
-          "out float amplitude;\n"
+          "out float amplitude"+VSout+";\n"
           "void main () {\n";
 
         if (mode_ == mode_t::SH) {
           source +=
-          "  amplitude = r_del_daz[0];\n";
+          "  amplitude"+VSout+" = r_del_daz[0];\n";
         } else if (mode_ == mode_t::TENSOR) {
           source +=
-          "  amplitude = 1.0 / dot (vertex, inv_tensor * vertex);\n";
+          "  vec3 new_vertex = tensor * vertex;\n"
+          "  amplitude"+VSout+" = length(new_vertex);\n";
         } else if (mode_ == mode_t::DIXEL) {
           source +=
-          "  amplitude = value;\n";
+          "  amplitude"+VSout+" = value;\n";
         }
 
         if (use_lighting_ && (mode_ == mode_t::SH || mode_ == mode_t::TENSOR)) {
@@ -212,7 +214,7 @@ namespace MR
 
         if (mode_ == mode_t::SH || mode_ == mode_t::TENSOR) {
           source +=
-          "  vec3 pos = vertex * amplitude * scale;\n"
+          "  vec3 pos = " + std::string(mode_ == mode_t::TENSOR ? "new_vertex" : "vertex * amplitude"+VSout) + " * scale;\n"
           "  if (reverse != 0)\n"
           "    pos = -pos;\n";
           if (orthographic_) {
@@ -227,7 +229,7 @@ namespace MR
         } else if (mode_ == mode_t::DIXEL) {
           source +=
           "  vert_dir = vertex;\n"
-          "  vert_pos = vertex * amplitude;\n"
+          "  vert_pos = vertex * amplitude"+VSout+";\n"
           "  if (reverse != 0) {\n"
           "     vert_dir = -vert_dir;\n"
           "     vert_pos = -vert_pos;\n"
@@ -254,6 +256,8 @@ namespace MR
             "in vec3 position_GSin[], color_GSin[];\n"
             "flat out vec3 face_normal;\n"
             "out vec3 position_GSout, color_GSout;\n"
+            "in float amplitude_GSin[];\n"
+            "out float amplitude_GSout;\n"
             "void main() {\n"
             "  vec3 mean_dir = normalize (vert_dir[0] + vert_dir[1] + vert_dir[2]);\n"
             "  vec3 vertices[3];\n"
@@ -287,6 +291,7 @@ namespace MR
             }
             source +=
             "  color_GSout = color_GSin["+v+"];\n"
+            "  amplitude_GSout = amplitude_GSin["+v+"];\n"
             "  EmitVertex();\n";
           }
           source +=
@@ -305,7 +310,7 @@ namespace MR
         source +=
           "uniform float ambient, diffuse, specular, shine;\n"
           "uniform vec3 light_pos;\n"
-          "in float amplitude;\n"
+          "in float amplitude"+FSin+";\n"
           "in vec3 position"+FSin+", color"+FSin+";\n";
 
         if (mode_ == mode_t::SH || mode_ == mode_t::TENSOR) {
@@ -319,7 +324,7 @@ namespace MR
         source +=
           "out vec3 final_color;\n"
           "void main() {\n"
-          "  if (amplitude < 0.0) {\n";
+          "  if (amplitude"+FSin+" < 0.0) {\n";
 
         if (hide_neg_values_) {
           source +=
@@ -342,7 +347,7 @@ namespace MR
           "  vec3 norm = face_normal;\n";
           }
           source +=
-          "  if (amplitude < 0.0)\n"
+          "  if (amplitude"+FSin+" < 0.0)\n"
           "    norm = -norm;\n"
           "  final_color *= ambient + diffuse * clamp (dot (norm, light_pos), 0, 1);\n"
           "  final_color += specular * pow (clamp (dot (reflect (-light_pos, norm), normalize(position"+FSin+")), 0, 1), shine);\n";
@@ -410,19 +415,20 @@ namespace MR
         gl::VertexAttribPointer (1, 3, gl::FLOAT, gl::FALSE_, 3*sizeof(GLfloat), (void*)0);
       }
 
-      void Renderer::SH::update_mesh (const size_t LOD, const int lmax)
+      void Renderer::SH::update_mesh (const size_t lod, const int lmax)
       {
         INFO ("updating ODF SH renderer transform...");
         QApplication::setOverrideCursor (Qt::BusyCursor);
         {
           Renderer::GrabContext context (parent.context_);
+          LOD = lod;
           half_sphere.LOD (LOD);
         }
         update_transform (half_sphere.vertices, lmax);
         QApplication::restoreOverrideCursor();
       }
 
-      void Renderer::SH::update_transform (const std::vector<Shapes::HalfSphere::Vertex>& vertices, int lmax)
+      void Renderer::SH::update_transform (const vector<Shapes::HalfSphere::Vertex>& vertices, int lmax)
       {
         // order is r, del, daz
 
@@ -432,7 +438,7 @@ namespace MR
           for (int l = 0; l <= lmax; l+=2) {
             for (int m = 0; m <= l; m++) {
               const int idx (Math::SH::index (l,m));
-              transform (3*n, idx) = transform(3*n, idx-2*m) = SH_NON_M0_SCALE_FACTOR Math::Legendre::Plm_sph<float> (l, m, vertices[n][2]);
+              transform (3*n, idx) = transform(3*n, idx-2*m) = (m ? Math::sqrt2 : 1.0) * Math::Legendre::Plm_sph<float> (l, m, vertices[n][2]);
             }
           }
 
@@ -450,7 +456,7 @@ namespace MR
             for (int l = 2* ( (m+1) /2); l <= lmax; l+=2) {
               const int idx (Math::SH::index (l,m));
               transform (3*n+1, idx) = - transform (3*n, idx-1) * sqrt (float ( (l+m) * (l-m+1)));
-              if (l > m) 
+              if (l > m)
                 transform (3*n+1,idx) += transform (3*n, idx+1) * sqrt (float ( (l-m) * (l+m+1)));
               transform (3*n+1, idx) /= 2.0;
 
@@ -525,12 +531,13 @@ namespace MR
         half_sphere.index_buffer.bind();
       }
 
-      void Renderer::Tensor::update_mesh (const size_t LOD)
+      void Renderer::Tensor::update_mesh (const size_t lod)
       {
         INFO ("updating tensor renderer...");
         QApplication::setOverrideCursor (Qt::BusyCursor);
         {
           Renderer::GrabContext context (parent.context_);
+          LOD = lod;
           half_sphere.LOD (LOD);
         }
         QApplication::restoreOverrideCursor();
@@ -547,11 +554,13 @@ namespace MR
         Eigen::FullPivLU<tensor_t> lu_decomp (D);
         const tensor_t Dinv = lu_decomp.inverse();
         if (data[0] <= 0.0f || data[1] <= 0.0f || data[2] <= 0.0f || Dinv.diagonal().minCoeff() < 0.0f) {
+          gl::UniformMatrix3fv (gl::GetUniformLocation (parent.shader, "tensor"), 1, gl::FALSE_, D.data());
           const tensor_t Dinv = tensor_t::Zero();
           gl::UniformMatrix3fv (gl::GetUniformLocation (parent.shader, "inv_tensor"), 1, gl::FALSE_, Dinv.data());
           const vector_t dec = vector_t::Zero (3);
           gl::Uniform3fv (gl::GetUniformLocation (parent.shader, "dec"), 1, dec.data());
         } else {
+          gl::UniformMatrix3fv (gl::GetUniformLocation (parent.shader, "tensor"), 1, gl::FALSE_, D.data());
           gl::UniformMatrix3fv (gl::GetUniformLocation (parent.shader, "inv_tensor"), 1, gl::FALSE_, Dinv.data());
           eig.computeDirect (D);
           const vector_t dec = eig.eigenvectors().col(2).array().abs();
@@ -628,9 +637,11 @@ namespace MR
 
       void Renderer::Dixel::update_dixels (const MR::DWI::Directions::Set& dirs)
       {
-        std::vector<std::array<GLint,3>> indices_data;
+        vector<Eigen::Vector3f> directions_data;
+        vector<std::array<GLint,3>> indices_data;
 
         for (size_t i = 0; i != dirs.size(); ++i) {
+          directions_data.push_back (dirs[i].cast<float>());
           for (auto j : dirs.get_adj_dirs(i)) {
             if (j > i) {
               for (auto k : dirs.get_adj_dirs(j)) {
@@ -641,15 +652,15 @@ namespace MR
                     if (I == i) {
 
                       // Invert a direction if required
-                      std::array<Eigen::Vector3f, 3> d {{ dirs[i], dirs[j], dirs[k] }};
-                      const Eigen::Vector3f mean_dir ((d[0]+d[1]+d[2]).normalized());
+                      std::array<Eigen::Vector3, 3> d {{ dirs[i], dirs[j], dirs[k] }};
+                      const Eigen::Vector3 mean_dir ((d[0]+d[1]+d[2]).normalized());
                       for (size_t v = 0; v != 3; ++v) {
-                        if (d[v].dot (mean_dir) < 0.0f)
+                        if (d[v].dot (mean_dir) < 0.0)
                           d[v] = -d[v];
                       }
                       // Conform to right hand rule
-                      const Eigen::Vector3f normal (((d[1]-d[0]).cross (d[2]-d[1])).normalized());
-                      if (normal.dot (mean_dir) < 0.0f)
+                      const Eigen::Vector3 normal (((d[1]-d[0]).cross (d[2]-d[1])).normalized());
+                      if (normal.dot (mean_dir) < 0.0)
                         indices_data.push_back ( {{GLint(i), GLint(k), GLint(j)}} );
                       else
                         indices_data.push_back ( {{GLint(i), GLint(j), GLint(k)}} );
@@ -667,7 +678,7 @@ namespace MR
         Renderer::GrabContext context (parent.context_);
         VAO.bind();
         vertex_buffer.bind (gl::ARRAY_BUFFER);
-        gl::BufferData (gl::ARRAY_BUFFER, dirs.size()*sizeof(Eigen::Vector3f), &dirs.get_dirs()[0][0], gl::STATIC_DRAW);
+        gl::BufferData (gl::ARRAY_BUFFER, dirs.size()*sizeof(Eigen::Vector3f), &directions_data[0], gl::STATIC_DRAW);
         gl::VertexAttribPointer (0, 3, gl::FLOAT, gl::FALSE_, 3*sizeof(GLfloat), (void*)0);
         index_buffer.bind();
         gl::BufferData (gl::ELEMENT_ARRAY_BUFFER, indices_data.size()*sizeof(std::array<GLint,3>), &indices_data[0], gl::STATIC_DRAW);

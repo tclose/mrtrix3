@@ -1,18 +1,16 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
-
 
 
 #include "command.h"
@@ -28,8 +26,7 @@ void usage ()
 {
   AUTHOR = "David Raffelt (david.raffelt@florey.edu.au)";
 
-  DESCRIPTION
-  + "Pad an image to increase the FOV";
+  SYNOPSIS = "Pad an image to increase the FOV";
 
   ARGUMENTS
   + Argument ("image_in",
@@ -40,14 +37,14 @@ void usage ()
   OPTIONS
   + Option   ("uniform",
               "pad the input image by a uniform number of voxels on all sides (in 3D)")
-  + Argument ("number").type_integer (0, 0, 1e6)
+  + Argument ("number").type_integer (0)
 
   + Option   ("axis",
               "pad the input image along the provided axis (defined by index). Lower and upper define "
               "the number of voxels to add to the lower and upper bounds of the axis").allow_multiple()
-  + Argument ("index").type_integer (0, 0, 2)
-  + Argument ("lower").type_integer (0, 0, 1e6)
-  + Argument ("upper").type_integer (0, 1e6, 1e6);
+  + Argument ("index").type_integer (0, 2)
+  + Argument ("lower").type_integer (0)
+  + Argument ("upper").type_integer (0);
 }
 
 
@@ -84,8 +81,8 @@ void run ()
   for (size_t axis = 0; axis < 3; ++axis) {
     output_header.size (axis) = output_header.size(axis) + padding[axis][0] + padding[axis][1];
     output_transform (axis, 3) +=	(output_transform (axis, 0) * (bounds[0][0] - padding[0][0]) * input_header.spacing (0))
-                                + (output_transform (axis, 1) * (bounds[1][0] - padding[0][0]) * input_header.spacing (1))
-                                + (output_transform (axis, 2) * (bounds[2][0] - padding[0][0]) * input_header.spacing (2));
+                                + (output_transform (axis, 1) * (bounds[1][0] - padding[1][0]) * input_header.spacing (1))
+                                + (output_transform (axis, 2) * (bounds[2][0] - padding[2][0]) * input_header.spacing (2));
   }
   output_header.transform() = output_transform;
   auto output = Image<float>::create (argument[1], output_header);

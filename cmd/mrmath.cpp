@@ -1,29 +1,31 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
 
 
+#include <limits>
+
 #include "command.h"
-#include "progressbar.h"
-#include "memory.h"
 #include "image.h"
+#include "memory.h"
+#include "phase_encoding.h"
+#include "progressbar.h"
 #include "algo/threaded_loop.h"
 #include "math/math.h"
 #include "math/median.h"
+#include "dwi/gradient.h"
 
 #include <limits>
-#include <vector>
 
 
 using namespace MR;
@@ -35,6 +37,7 @@ const char* operations[] = {
   "sum",
   "product",
   "rms",
+  "norm",
   "var",
   "std",
   "min",
@@ -46,11 +49,15 @@ const char* operations[] = {
 
 void usage ()
 {
-  DESCRIPTION
-    + "compute summary statistic on image intensities either across images, "
-    "or along a specified axis for a single image. Supported operations are:"
+  AUTHOR = "J-Donald Tournier (jdtournier@gmail.com)";
 
-    + "mean, median, sum, product, rms (root-mean-square value), var (unbiased variance), "
+  SYNOPSIS = "Compute summary statistic on image intensities either across images, "
+             "or along a specified axis of a single image";
+
+  DESCRIPTION
+    + "Supported operations are:"
+
+    + "mean, median, sum, product, rms (root-mean-square value), norm (vector 2-norm), var (unbiased variance), "
     "std (unbiased standard deviation), min, max, absmax (maximum absolute value), "
     "magmax (value with maximum absolute value, preserving its sign)."
 
@@ -63,61 +70,61 @@ void usage ()
 
   OPTIONS
   + Option ("axis", "perform operation along a specified axis of a single input image")
-  +   Argument ("index").type_integer()
+    + Argument ("index").type_integer (0)
 
   + DataType::options();
 }
 
 
-typedef float value_type;
+using value_type = float;
 
 
-class Mean {
+class Mean { NOMEMALIGN
   public:
     Mean () : sum (0.0), count (0) { }
-    void operator() (value_type val) { 
+    void operator() (value_type val) {
       if (std::isfinite (val)) {
         sum += val;
         ++count;
       }
     }
-    value_type result () const { 
+    value_type result () const {
       if (!count)
         return NAN;
-      return sum / count; 
+      return sum / count;
     }
     double sum;
     size_t count;
 };
 
-class Median {
+class Median { NOMEMALIGN
   public:
     Median () { }
-    void operator() (value_type val) { 
+    void operator() (value_type val) {
       if (!std::isnan (val))
         values.push_back(val);
     }
-    value_type result () { 
+    value_type result () {
       return Math::median(values);
     }
-    std::vector<value_type> values; 
+    vector<value_type> values;
 };
 
-class Sum {
+class Sum { NOMEMALIGN
   public:
     Sum () : sum (0.0) { }
-    void operator() (value_type val) { 
-      if (std::isfinite (val)) 
+    void operator() (value_type val) {
+      if (std::isfinite (val))
         sum += val;
     }
-    value_type result () const { 
-      return sum; 
+    value_type result () const {
+      return sum;
     }
     double sum;
 };
 
 
-class Product {
+class Product { NOMEMALIGN
   public:
     Product () : product (NAN) { }
     void operator() (value_type val) {
@@ -131,7 +138,7 @@ class Product {
 };
 
 
-class RMS {
+class RMS { NOMEMALIGN
   public:
     RMS() : sum (0.0), count (0) { }
     void operator() (value_type val) {
@@ -149,19 +156,37 @@ class RMS {
     size_t count;
 };
 
+class NORM2 { NOMEMALIGN
+  public:
+    NORM2() : sum (0.0), count (0) { }
+    void operator() (value_type val) {
+      if (std::isfinite (val)) {
+        sum += Math::pow2 (val);
+        ++count;
+      }
+    }
+    value_type result() const {
+      if (!count)
+        return NAN;
+      return std::sqrt(sum);
+    }
+    double sum;
+    size_t count;
+};
 
-class Var {
+
+class Var { NOMEMALIGN
   public:
     Var () : sum (0.0), sum_sqr (0.0), count (0) { }
-    void operator() (value_type val) { 
+    void operator() (value_type val) {
       if (std::isfinite (val)) {
         sum += val;
         sum_sqr += Math::pow2 (val);
         ++count;
       }
     }
-    value_type result () const { 
-      if (count < 2) 
+    value_type result () const {
+      if (count < 2)
         return NAN;
       return  (sum_sqr - Math::pow2 (sum) / static_cast<double> (count)) / (static_cast<double> (count) - 1.0);
     }
@@ -170,18 +195,18 @@ class Var {
 };
 
 
-class Std : public Var {
+class Std : public Var { NOMEMALIGN
   public:
     Std() : Var() { }
     value_type result () const { return std::sqrt (Var::result()); }
 };
 
 
-class Min {
+class Min { NOMEMALIGN
   public:
     Min () : min (std::numeric_limits<value_type>::infinity()) { }
-    void operator() (value_type val) { 
-      if (std::isfinite (val) && val < min) 
+    void operator() (value_type val) {
+      if (std::isfinite (val) && val < min)
         min = val;
     }
     value_type result () const { return std::isfinite (min) ? min : NAN; }
@@ -189,11 +214,11 @@ class Min {
 };
 
 
-class Max {
+class Max { NOMEMALIGN
   public:
     Max () : max (-std::numeric_limits<value_type>::infinity()) { }
-    void operator() (value_type val) { 
-      if (std::isfinite (val) && val > max) 
+    void operator() (value_type val) {
+      if (std::isfinite (val) && val > max)
         max = val;
     }
     value_type result () const { return std::isfinite (max) ? max : NAN; }
@@ -201,23 +226,23 @@ class Max {
 };
 
 
-class AbsMax {
+class AbsMax { NOMEMALIGN
   public:
     AbsMax () : max (-std::numeric_limits<value_type>::infinity()) { }
-    void operator() (value_type val) { 
-      if (std::isfinite (val) && std::abs(val) > max) 
-        max = std::abs(val);
+    void operator() (value_type val) {
+      if (std::isfinite (val) && abs(val) > max)
+        max = abs(val);
     }
     value_type result () const { return std::isfinite (max) ? max : NAN; }
     value_type max;
 };
 
-class MagMax {
+class MagMax { NOMEMALIGN
   public:
     MagMax () : max (-std::numeric_limits<value_type>::infinity()) { }
     MagMax (const int i) : max (-std::numeric_limits<value_type>::infinity()) { }
-    void operator() (value_type val) { 
-      if (std::isfinite (val) && (!std::isfinite (max) || std::abs(val) > std::abs (max)))
+    void operator() (value_type val) {
+      if (std::isfinite (val) && (!std::isfinite (max) || abs(val) > abs (max)))
         max = val;
     }
     value_type result () const { return std::isfinite (max) ? max : NAN; }
@@ -229,7 +254,7 @@ class MagMax {
 
 
 template <class Operation>
-class AxisKernel {
+class AxisKernel { NOMEMALIGN
   public:
     AxisKernel (size_t axis) : axis (axis) { }
 
@@ -248,8 +273,9 @@ class AxisKernel {
 
 
 
-class ImageKernelBase {
+class ImageKernelBase { NOMEMALIGN
   public:
+    virtual ~ImageKernelBase () { }
     virtual void process (Header& image_in) = 0;
     virtual void write_back (Image<value_type>& out) = 0;
 };
@@ -257,29 +283,29 @@ class ImageKernelBase {
 
 
 template <class Operation>
-class ImageKernel : public ImageKernelBase {
+class ImageKernel : public ImageKernelBase { NOMEMALIGN
   protected:
-    class InitFunctor { 
-      public: 
-        template <class ImageType> 
-          void operator() (ImageType& out) const { out.value() = Operation(); } 
+    class InitFunctor { NOMEMALIGN
+      public:
+        template <class ImageType>
+          void operator() (ImageType& out) const { out.value() = Operation(); }
     };
-    class ProcessFunctor { 
-      public: 
-        template <class ImageType1, class ImageType2>
-          void operator() (ImageType1& out, ImageType2& in) const { 
-            Operation op = out.value(); 
-            op (in.value()); 
-            out.value() = op;
-          } 
-    };
-    class ResultFunctor {
-      public: 
+    class ProcessFunctor { NOMEMALIGN
+      public:
         template <class ImageType1, class ImageType2>
           void operator() (ImageType1& out, ImageType2& in) const {
-            Operation op = in.value(); 
-            out.value() = op.result(); 
-          } 
+            Operation op = out.value();
+            op (in.value());
+            out.value() = op;
+          }
+    };
+    class ResultFunctor { NOMEMALIGN
+      public:
+        template <class ImageType1, class ImageType2>
+          void operator() (ImageType1& out, ImageType2& in) const {
+            Operation op = in.value();
+            out.value() = op.result();
+          }
     };
 
   public:
@@ -325,8 +351,16 @@ void run ()
     if (axis >= image_in.ndim())
       throw Exception ("Cannot perform operation along axis " + str (axis) + "; image only has " + str(image_in.ndim()) + " axes");
 
-
     Header header_out (image_in);
+
+    if (axis == 3) {
+      try {
+        const auto DW_scheme = DWI::parse_DW_scheme (header_out);
+        DWI::stash_DW_scheme (header_out, DW_scheme);
+      } catch (...) { }
+      DWI::clear_DW_scheme (header_out);
+      PhaseEncoding::clear_scheme (header_out);
+    }
 
     header_out.datatype() = DataType::from_command_line (DataType::Float32);
     header_out.size(axis) = 1;
@@ -342,12 +376,13 @@ void run ()
       case 2: loop.run  (AxisKernel<Sum>    (axis), image_in, image_out); return;
       case 3: loop.run  (AxisKernel<Product>(axis), image_in, image_out); return;
       case 4: loop.run  (AxisKernel<RMS>    (axis), image_in, image_out); return;
-      case 5: loop.run  (AxisKernel<Var>    (axis), image_in, image_out); return;
-      case 6: loop.run  (AxisKernel<Std>    (axis), image_in, image_out); return;
-      case 7: loop.run  (AxisKernel<Min>    (axis), image_in, image_out); return;
-      case 8: loop.run  (AxisKernel<Max>    (axis), image_in, image_out); return;
-      case 9: loop.run  (AxisKernel<AbsMax> (axis), image_in, image_out); return;
-      case 10: loop.run (AxisKernel<MagMax> (axis), image_in, image_out); return;
+      case 5: loop.run  (AxisKernel<NORM2>  (axis), image_in, image_out); return;
+      case 6: loop.run  (AxisKernel<Var>    (axis), image_in, image_out); return;
+      case 7: loop.run  (AxisKernel<Std>    (axis), image_in, image_out); return;
+      case 8: loop.run  (AxisKernel<Min>    (axis), image_in, image_out); return;
+      case 9: loop.run  (AxisKernel<Max>    (axis), image_in, image_out); return;
+      case 10: loop.run  (AxisKernel<AbsMax> (axis), image_in, image_out); return;
+      case 11: loop.run (AxisKernel<MagMax> (axis), image_in, image_out); return;
       default: assert (0);
     }
 
@@ -357,23 +392,22 @@ void run ()
       throw Exception ("mrmath requires either multiple input images, or the -axis option to be provided");
 
     // Pre-load all image headers
-    std::vector<Header> headers_in;
-    // std::vector<std::unique_ptr<Header>> headers_in;
+    vector<Header> headers_in (num_inputs);
 
     // Header of first input image is the template to which all other input images are compared
-    headers_in.push_back (Header::open (argument[0]));
+    headers_in[0] = Header::open (argument[0]);
     Header header (headers_in[0]);
     header.datatype() = DataType::from_command_line (DataType::Float32);
 
     // Wipe any excess unary-dimensional axes
     while (header.size (header.ndim() - 1) == 1)
-      header.set_ndim (header.ndim() - 1);
+      header.ndim() = header.ndim() - 1;
 
     // Verify that dimensions of all input images adequately match
     for (size_t i = 1; i != num_inputs; ++i) {
       const std::string path = argument[i];
       // headers_in.push_back (std::unique_ptr<Header> (new Header (Header::open (path))));
-      headers_in.push_back (Header::open (path));
+      headers_in[i] = Header::open (path);
       const Header& temp (headers_in[i]);
       if (temp.ndim() < header.ndim())
         throw Exception ("Image " + path + " has fewer axes than first imput image " + header.name());
@@ -387,6 +421,11 @@ void run ()
       }
     }
 
+    // Wipe any header information that can't be guaranteed to still be accurate
+    //   after applying an operator across multiple images
+    header.keyval().erase ("dw_scheme");
+    PhaseEncoding::clear_scheme (header);
+
     // Instantiate a kernel depending on the operation requested
     std::unique_ptr<ImageKernelBase> kernel;
     switch (op) {
@@ -395,20 +434,22 @@ void run ()
       case 2:  kernel.reset (new ImageKernel<Sum>     (header)); break;
       case 3:  kernel.reset (new ImageKernel<Product> (header)); break;
       case 4:  kernel.reset (new ImageKernel<RMS>     (header)); break;
-      case 5:  kernel.reset (new ImageKernel<Var>     (header)); break;
-      case 6:  kernel.reset (new ImageKernel<Std>     (header)); break;
-      case 7:  kernel.reset (new ImageKernel<Min>     (header)); break;
-      case 8:  kernel.reset (new ImageKernel<Max>     (header)); break;
-      case 9:  kernel.reset (new ImageKernel<AbsMax>  (header)); break;
-      case 10: kernel.reset (new ImageKernel<MagMax>  (header)); break;
+      case 5:  kernel.reset (new ImageKernel<NORM2>   (header)); break;
+      case 6:  kernel.reset (new ImageKernel<Var>     (header)); break;
+      case 7:  kernel.reset (new ImageKernel<Std>     (header)); break;
+      case 8:  kernel.reset (new ImageKernel<Min>     (header)); break;
+      case 9:  kernel.reset (new ImageKernel<Max>     (header)); break;
+      case 10:  kernel.reset (new ImageKernel<AbsMax>  (header)); break;
+      case 11: kernel.reset (new ImageKernel<MagMax>  (header)); break;
       default: assert (0);
     }
 
     // Feed the input images to the kernel one at a time
     {
-      ProgressBar progress (std::string("computing ") + operations[op] + " across " 
+      ProgressBar progress (std::string("computing ") + operations[op] + " across "
           + str(headers_in.size()) + " images", num_inputs);
       for (size_t i = 0; i != headers_in.size(); ++i) {
+        assert (headers_in[i].valid());
         assert (headers_in[i].is_file_backed());
         kernel->process (headers_in[i]);
         ++progress;
@@ -416,7 +457,7 @@ void run ()
     }
 
     auto out = Header::create (output_path, header).get_image<value_type>();
-    kernel->write_back (out); 
+    kernel->write_back (out);
   }
 
 }

@@ -1,22 +1,23 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
+
 
 #include "gui/mrview/tool/connectome/node_overlay.h"
 
 #include <limits>
-#include <vector>
+
+#include "types.h"
 
 namespace MR
 {
@@ -36,7 +37,8 @@ namespace MR
           tex_positions.assign  (3, -1);
           set_interpolate       (false);
           set_colourmap         (5);
-          set_min_max           (0.0f, 1.0f);
+          value_min = 0.0f; value_max = 1.0f;
+          min_max_set           ();
           set_allowed_features  (true, true, true);
           set_use_discard_lower (true);
           set_use_discard_upper (false);
@@ -74,7 +76,7 @@ namespace MR
           get_axes (plane, x, y);
           const ssize_t xsize = data.size (x), ysize = data.size (y);
 
-          std::vector<float> texture_data;
+          vector<float> texture_data;
           texture_data.resize (4*xsize*ysize, 0.0f);
           if (tex_positions[plane] >= 0 && tex_positions[plane] < data.size (plane)) {
             data.index(plane) = slice;

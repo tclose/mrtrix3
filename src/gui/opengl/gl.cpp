@@ -1,17 +1,17 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
+
 
 #include "gui/opengl/gl.h"
 #include "file/config.h"
@@ -28,7 +28,7 @@ namespace MR
         //CONF option: VSync
         //CONF default: 0 (false)
         //CONF Whether the screen update should synchronise with the monitor's
-        //CONF vertical refresh (to avoid tearing artefacts). 
+        //CONF vertical refresh (to avoid tearing artefacts).
         
         //CONF option: NeedOpenGLCoreProfile
         //CONF default: 1 (true)
@@ -39,7 +39,7 @@ namespace MR
         //CONF option: MSAA
         //CONF default: 0 (false)
         //CONF How many samples to use for multi-sample anti-aliasing (to
-        //CONF improve display quality). 
+        //CONF improve display quality).
 
         GL::Format f;
 #if QT_VERSION >= 0x050400

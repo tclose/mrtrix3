@@ -1,17 +1,17 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
+
 
 #ifndef __dwi_tractography_file_base_h__
 #define __dwi_tractography_file_base_h__
@@ -37,7 +37,7 @@ namespace MR
 
       //! \cond skip
       class __ReaderBase__
-      {
+      { NOMEMALIGN
         public:
           ~__ReaderBase__ () {
             if (in.is_open())
@@ -57,16 +57,17 @@ namespace MR
 
       template <typename ValueType = float>
         class __WriterBase__
-        {
+        { NOMEMALIGN
           public:
-            typedef ValueType value_type;
+            using value_type = ValueType;
 
             __WriterBase__(const std::string& name) :
               count (0),
               total_count (0),
-              name (name), 
+              name (name),
               dtype (DataType::from<ValueType>()),
-              count_offset (0)
+              count_offset (0),
+              open_success (false)
           {
             dtype.set_byte_order_native();
             if (dtype != DataType::Float32LE && dtype != DataType::Float32BE &&
@@ -78,8 +79,10 @@ namespace MR
 
             ~__WriterBase__()
             {
-              File::OFStream out (name, std::ios::in | std::ios::out | std::ios::binary);
-              update_counts (out);
+              if (open_success) {
+                File::OFStream out (name, std::ios::in | std::ios::out | std::ios::binary);
+                update_counts (out);
+              }
             }
 
             void create (File::OFStream& out, const Properties& properties, const std::string& type) {
@@ -90,7 +93,7 @@ namespace MR
                   out << i.first << ": " << i.second << "\n";
               }
 
-              for (const auto& i : properties.comments) 
+              for (const auto& i : properties.comments)
                 out << "comment: " << i << "\n";
 
               for (size_t n = 0; n < properties.seeds.num_seeds(); ++n)
@@ -118,13 +121,17 @@ namespace MR
             }
 
 
+            void skip() { ++total_count; }
+
+
             uint64_t count, total_count;
 
 
           protected:
             std::string name;
             DataType dtype;
-            int64_t  count_offset;
+            int64_t count_offset;
+            bool open_success;
 
 
             void verify_stream (const File::OFStream& out) {

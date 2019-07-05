@@ -1,18 +1,16 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
-
 
 
 #include "command.h"
@@ -41,10 +39,9 @@ using namespace App;
 void usage ()
 {
 
-	AUTHOR = "Robert E. Smith (r.smith@brain.org.au)";
+  AUTHOR = "Robert E. Smith (robert.smith@florey.edu.au)";
 
-  DESCRIPTION
-  + "generate an image for visualisation purposes from an ACT 5TT segmented anatomical image";
+  SYNOPSIS = "Generate an image for visualisation purposes from an ACT 5TT segmented anatomical image";
 
   ARGUMENTS
   + Argument ("input",  "the input 4D tissue-segmented image").type_image_in()
@@ -52,23 +49,23 @@ void usage ()
 
   OPTIONS
 
-  + Option ("bg",   "image intensity of background")
-    + Argument ("value").type_float (0.0, VALUE_DEFAULT_BG,   1.0)
+  + Option ("bg",   "image intensity of background (default: " + str(VALUE_DEFAULT_BG, 2) + ")")
+    + Argument ("value").type_float (0.0, 1.0)
 
-  + Option ("cgm",  "image intensity of cortical grey matter")
-    + Argument ("value").type_float (0.0, VALUE_DEFAULT_CGM,  1.0)
+  + Option ("cgm",  "image intensity of cortical grey matter (default: " + str(VALUE_DEFAULT_CGM, 2) + ")")
+    + Argument ("value").type_float (0.0, 1.0)
 
-  + Option ("sgm",  "image intensity of sub-cortical grey matter")
-    + Argument ("value").type_float (0.0, VALUE_DEFAULT_SGM,  1.0)
+  + Option ("sgm",  "image intensity of sub-cortical grey matter (default: " + str(VALUE_DEFAULT_SGM, 2) + ")")
+    + Argument ("value").type_float (0.0, 1.0)
 
-  + Option ("wm",   "image intensity of white matter")
-    + Argument ("value").type_float (0.0, VALUE_DEFAULT_WM,   1.0)
+  + Option ("wm",   "image intensity of white matter (default: " + str(VALUE_DEFAULT_WM, 2) + ")")
+    + Argument ("value").type_float (0.0, 1.0)
 
-  + Option ("csf",  "image intensity of CSF")
-    + Argument ("value").type_float (0.0, VALUE_DEFAULT_CSF,  1.0)
+  + Option ("csf",  "image intensity of CSF (default: " + str(VALUE_DEFAULT_CSF, 2) + ")")
+    + Argument ("value").type_float (0.0, 1.0)
 
-  + Option ("path", "image intensity of pathological tissue")
-    + Argument ("value").type_float (0.0, VALUE_DEFAULT_PATH, 10.0);
+  + Option ("path", "image intensity of pathological tissue (default: " + str(VALUE_DEFAULT_PATH, 2) + ")")
+    + Argument ("value").type_float (0.0, 10.0);
 
 }
 
@@ -85,13 +82,13 @@ void run ()
   DWI::Tractography::ACT::verify_5TT_image (input);
 
   Header H (input);
-  H.set_ndim (3);
+  H.ndim() = 3;
 
-  const float bg_multiplier   = get_option_value ("bg", VALUE_DEFAULT_BG);
-  const float cgm_multiplier  = get_option_value ("cgm", VALUE_DEFAULT_CGM);
-  const float sgm_multiplier  = get_option_value ("sgm", VALUE_DEFAULT_SGM);
-  const float wm_multiplier   = get_option_value ("wm", VALUE_DEFAULT_WM);
-  const float csf_multiplier  = get_option_value ("csf", VALUE_DEFAULT_CSF);
+  const float bg_multiplier   = get_option_value ("bg",   VALUE_DEFAULT_BG);
+  const float cgm_multiplier  = get_option_value ("cgm",  VALUE_DEFAULT_CGM);
+  const float sgm_multiplier  = get_option_value ("sgm",  VALUE_DEFAULT_SGM);
+  const float wm_multiplier   = get_option_value ("wm",   VALUE_DEFAULT_WM);
+  const float csf_multiplier  = get_option_value ("csf",  VALUE_DEFAULT_CSF);
   const float path_multiplier = get_option_value ("path", VALUE_DEFAULT_PATH);
 
   auto output = Image<float>::create (argument[1], H);

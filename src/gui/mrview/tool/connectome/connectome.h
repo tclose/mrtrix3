@@ -1,26 +1,26 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
+
 
 #ifndef __gui_mrview_tool_connectome_connectome_h__
 #define __gui_mrview_tool_connectome_connectome_h__
 
 #include <map>
-#include <vector>
 
 #include "bitset.h"
 #include "image.h"
+#include "types.h"
 
 #include "gui/opengl/gl.h"
 #include "gui/opengl/lighting.h"
@@ -37,10 +37,9 @@
 #include "gui/color_button.h"
 #include "gui/projection.h"
 
-#include "mesh/mesh.h"
+#include "surface/mesh.h"
 
 #include "connectome/mat2vec.h"
-#include "connectome/config/config.h"
 #include "connectome/lut.h"
 
 #include "gui/mrview/tool/connectome/colourmap_observers.h"
@@ -67,7 +66,7 @@ namespace MR
       {
 
         class Connectome : public Base
-        {
+        { MEMALIGN(Connectome)
             Q_OBJECT
 
             enum class node_visibility_matrix_operator_t { ANY, ALL };
@@ -133,8 +132,7 @@ namespace MR
             void edge_alpha_value_slot (int);
             void edge_alpha_parameter_slot();
 
-            void config_open_slot();
-            void lut_open_slot (int);
+            void lut_open_slot ();
             void lighting_change_slot (int);
             void lighting_settings_slot();
             void lighting_parameter_slot();
@@ -194,6 +192,7 @@ namespace MR
             QLabel *edge_visibility_threshold_label;
             AdjustButton *edge_visibility_threshold_button;
             QCheckBox *edge_visibility_threshold_invert_checkbox;
+            QCheckBox *edge_visibility_by_nodes_checkbox;
 
             QComboBox *edge_geometry_combobox;
             QLabel *edge_geometry_cylinder_lod_label;
@@ -221,8 +220,7 @@ namespace MR
             AdjustButton *edge_alpha_lower_button, *edge_alpha_upper_button;
             QCheckBox *edge_alpha_invert_checkbox;
 
-            QPushButton *config_button;
-            QComboBox *lut_combobox;
+            QPushButton *lut_button;
             QCheckBox *lighting_checkbox;
             QPushButton *lighting_settings_button;
             QCheckBox *crop_to_slab_checkbox;
@@ -242,27 +240,17 @@ namespace MR
             std::unique_ptr< MR::Image<node_t> > buffer;
 
 
-            std::vector<Node> nodes;
-            std::vector<Edge> edges;
+            vector<Node> nodes;
+            vector<Edge> edges;
 
 
             // For converting connectome matrices to vectors
-            MR::Connectome::Mat2Vec mat2vec;
+            std::unique_ptr<MR::Connectome::Mat2Vec> mat2vec;
 
 
             // If a lookup table is provided, this container will store the
             //   properties of each node as provided in that file (e.g. name & colour)
-            Node_map lut;
-
-            // If a connectome configuration file is provided, this will map
-            //   each structure name to an index in the parcellation image;
-            //   this can then be used to produce the lookup table
-            std::vector<std::string> config;
-
-            // If both a LUT and a config file have been provided, this provides
-            //   a direct vector mapping from image node index to a position in
-            //   the lookup table, pre-generated
-            std::vector<Node_map::const_iterator> lut_mapping;
+            MR::Connectome::LUT lut;
 
 
             // Fixed lighting settings from the main window, and popup dialog
@@ -364,7 +352,7 @@ namespace MR
             void clear_all();
             void enable_all (const bool);
             void initialise (const std::string&);
-            void add_matrices (const std::vector<std::string>&);
+            void add_matrices (const vector<std::string>&);
 
             void draw_nodes (const Projection&);
             void draw_edges (const Projection&);
@@ -388,7 +376,7 @@ namespace MR
 
             // Helper functions for determining actual node / edge visual properties
             //   given current selection status
-            void node_selection_changed (const std::vector<node_t>&);
+            void           node_selection_changed          (const vector<node_t>&);
             bool           node_visibility_given_selection (const node_t);
             Eigen::Array3f node_colour_given_selection     (const node_t);
             float          node_size_given_selection       (const node_t);
@@ -407,6 +395,13 @@ namespace MR
             void update_controls_edge_colour     (const float, const float, const float);
             void update_controls_edge_size       (const float, const float, const float);
             void update_controls_edge_alpha      (const float, const float, const float);
+
+            // Uses the value of the maximum control to set the maximal limit of the
+            //   minimum control, and vice-versa
+            void limit_min_max_controls (AdjustButton* const, AdjustButton* const) const;
+            // Update the values & limits of controls based on statistics of input data
+            void update_control (AdjustButton* const, const float, const float, const float);
+            void update_controls (AdjustButton* const, AdjustButton* const, const float, const float, const float);
 
             void get_meshes();
             void get_exemplars();

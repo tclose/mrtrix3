@@ -1,16 +1,15 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
 
 
@@ -21,6 +20,7 @@
 #include "filter/base.h"
 #include "filter/fft.h"
 #include "filter/gradient.h"
+#include "filter/normalise.h"
 #include "filter/median.h"
 #include "filter/smooth.h"
 
@@ -29,7 +29,7 @@ using namespace MR;
 using namespace App;
 
 
-const char* filters[] = { "fft", "gradient", "median", "smooth", NULL };
+const char* filters[] = { "fft", "gradient", "median", "smooth", "normalise", nullptr };
 
 
 const OptionGroup FFTOption = OptionGroup ("Options for FFT filter")
@@ -72,6 +72,12 @@ const OptionGroup MedianOption = OptionGroup ("Options for median filter")
         "or as a comma-separated list of 3 values, one for each axis (default: 3x3x3).")
     + Argument ("size").type_sequence_int();
 
+const OptionGroup NormaliseOption = OptionGroup ("Options for normalisation filter")
+
+  + Option ("extent", "specify extent of normalisation filtering neighbourhood in voxels. "
+        "This can be specified either as a single value to be used for all 3 axes, "
+        "or as a comma-separated list of 3 values, one for each axis (default: 3x3x3).")
+    + Argument ("size").type_sequence_int();
 
 
 const OptionGroup SmoothOption = OptionGroup ("Options for smooth filter")
@@ -98,12 +104,14 @@ const OptionGroup SmoothOption = OptionGroup ("Options for smooth filter")
 
 void usage ()
 {
-  AUTHOR = "Robert E. Smith (r.smith@brain.org.au), David Raffelt (david.raffelt@florey.edu.au) and J-Donald Tournier (jdtournier@gmail.com)";
+  AUTHOR = "Robert E. Smith (robert.smith@florey.edu.au), David Raffelt (david.raffelt@florey.edu.au) and J-Donald Tournier (jdtournier@gmail.com)";
+
+  SYNOPSIS = "Perform filtering operations on 3D / 4D MR images";
 
   DESCRIPTION
-  + "Perform filtering operations on 3D / 4D MR images. For 4D images, each 3D volume is processed independently."
-  + "The available filters are: fft, gradient, median, smooth."
-  + "Each filter has its own unique set of optional parameters.";
+  + "The available filters are: fft, gradient, median, smooth, normalise."
+  + "Each filter has its own unique set of optional parameters."
+  + "For 4D images, each 3D volume is processed independently.";
 
   ARGUMENTS
   + Argument ("input",  "the input image.").type_image_in ()
@@ -114,6 +122,7 @@ void usage ()
   + FFTOption
   + GradientOption
   + MedianOption
+  + NormaliseOption
   + SmoothOption
   + Stride::Options;
 }
@@ -146,7 +155,7 @@ void run () {
         filter.datatype() = DataType::Float32;
         auto output = Image<float>::create (argument[2], filter);
         for (auto l = Loop (output) (temp, output); l; ++l)
-          output.value() = std::abs (cdouble(temp.value()));
+          output.value() = abs (cdouble(temp.value()));
       } else {
         auto output = Image<cdouble>::create (argument[2], filter);
         filter (input, output);
@@ -160,7 +169,7 @@ void run () {
       auto input = Image<float>::open (argument[0]);
       Filter::Gradient filter (input, get_options ("magnitude").size());
 
-      std::vector<default_type> stdev;
+      vector<default_type> stdev;
       auto opt = get_options ("stdev");
       if (opt.size()) {
         stdev = parse_floats (opt[0][0]);
@@ -170,15 +179,14 @@ void run () {
         if (stdev.size() != 1 && stdev.size() != 3)
           throw Exception ("unexpected number of elements specified in Gaussian stdev");
       } else {
-        stdev.resize (filter.ndim(), 0.0);
+        stdev.resize (3, 0.0);
         for (size_t dim = 0; dim != 3; ++dim)
           stdev[dim] = filter.spacing (dim);
       }
-      filter.set_stdev (stdev);
       filter.compute_wrt_scanner (get_options ("scanner").size() ? true : false);
       filter.set_message (std::string("applying ") + std::string(argument[1]) + " filter to image " + std::string(argument[0]));
       Stride::set_from_command_line (filter);
-
+      filter.set_stdev (stdev);
       auto output = Image<float>::create (argument[2], filter);
       filter (input, output);
     break;
@@ -215,7 +223,7 @@ void run () {
       if (opt.size()) {
         if (stdev_supplied)
           throw Exception ("the stdev and FWHM options are mutually exclusive.");
-        std::vector<default_type> stdevs = parse_floats((opt[0][0]));
+        vector<default_type> stdevs = parse_floats((opt[0][0]));
         for (size_t d = 0; d < stdevs.size(); ++d)
           stdevs[d] = stdevs[d] / 2.3548;  //convert FWHM to stdev
         filter.set_stdev (stdevs);
@@ -227,9 +235,27 @@ void run () {
       Stride::set_from_command_line (filter);
 
       auto output = Image<float>::create (argument[2], filter);
-      filter (input, output);
+      threaded_copy (input, output);
+      filter (output);
       break;
     }
+
+    // Normalisation
+    case 4:
+    {
+      auto input = Image<float>::open (argument[0]);
+      Filter::Normalise filter (input);
+
+      auto opt = get_options ("extent");
+      if (opt.size())
+        filter.set_extent (parse_ints (opt[0][0]));
+      filter.set_message (std::string("applying ") + std::string(argument[1]) + " filter to image " + std::string(argument[0]) + "...");
+      Stride::set_from_command_line (filter);
+
+      auto output = Image<float>::create (argument[2], filter);
+      filter (input, output);
+      break;
+     }
 
     default:
       assert (0);

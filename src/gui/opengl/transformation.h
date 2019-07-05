@@ -1,17 +1,17 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
+
 
 #ifndef __gui_opengl_transformation_h__
 #define __gui_opengl_transformation_h__
@@ -33,7 +33,7 @@ namespace MR
 
 
 
-      class vec4 {
+      class vec4 { MEMALIGN(vec4)
         public:
           vec4 () { }
           vec4 (float x, float y, float z, float w) { v[0] = x; v[1] = y; v[2] = z; v[3] = w; }
@@ -63,7 +63,7 @@ namespace MR
 
 
 
-      class mat4 {
+      class mat4 { MEMALIGN(mat4)
         public:
           mat4 () { } 
           mat4 (const mat4& a) { memcpy (m, a.m, sizeof(m)); }
@@ -236,8 +236,8 @@ namespace MR
         mat4 m;
         m.zero();
         m(0,0) = x;
-        m(1,1) = z;
-        m(2,2) = y;
+        m(1,1) = y;
+        m(2,2) = z;
         m(3,3) = 1.0f;
         return m;
       }

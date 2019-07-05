@@ -1,18 +1,16 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
-
 
 
 #include "dwi/tractography/SIFT/proc_mask.h"
@@ -63,7 +61,7 @@ namespace MR
               ACT::verify_5TT_image (in_5tt);
 
               Header H_5tt (in_dwi);
-              H_5tt.set_ndim (4);
+              H_5tt.ndim() = 4;
               H_5tt.size(3) = 5;
               assert (!out_5tt.valid());
               out_5tt = Image<float>::scratch (H_5tt, "5TT scratch buffer");
@@ -83,9 +81,13 @@ namespace MR
               out_5tt.index(3) = 2; // Access the WM fraction
               float integral = 0.0f;
               for (auto l = Loop (out_5tt, 0, 3) (out_5tt, out_mask); l; ++l) {
-                const float value = Math::pow2<float> (out_5tt.value()); // Processing mask value is the square of the WM fraction 
-                out_mask.value() = value;
-                integral += value;
+                const float value = Math::pow2<float> (out_5tt.value()); // Processing mask value is the square of the WM fraction
+                if (std::isfinite (value)) {
+                  out_mask.value() = value;
+                  integral += value;
+                } else {
+                  out_mask.value() = 0.0f;
+                }
               }
               if (!integral)
                 throw Exception ("Processing mask is empty; check input images / registration");

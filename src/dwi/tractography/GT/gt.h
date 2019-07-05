@@ -1,17 +1,17 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
+
 
 #ifndef __gt_gt_h__
 #define __gt_gt_h__
@@ -21,12 +21,12 @@
 #define FRAC_PHASEOUT 10
 
 #include <iostream>
-#include <vector>
 #include <mutex>
 
 #include <Eigen/Dense>
 
 #include "progressbar.h"
+#include "types.h"
 
 
 namespace MR {
@@ -34,12 +34,12 @@ namespace MR {
     namespace Tractography {
       namespace GT {
         
-        const double M_4PI = 4 * M_PI;
+        const double M_4PI = 4.0 * Math::pi;
         const double M_sqrt4PI = std::sqrt(M_4PI);
         
         
         struct Properties
-        {
+        { MEMALIGN(Properties)
           float p_birth;
           float p_death;
           float p_shift;
@@ -57,14 +57,14 @@ namespace MR {
           double ppot;
           
           Eigen::MatrixXf resp_WM;
-          std::vector< Eigen::VectorXf > resp_ISO;
+          vector< Eigen::VectorXf > resp_ISO;
           
         };
         
         
         
         class Stats
-        {
+        { MEMALIGN(Stats)
         public:
           
           Stats(const double T0, const double T1, const uint64_t maxiter) 

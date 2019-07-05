@@ -1,17 +1,17 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
+
 
 #include "gui/mrview/tool/odf/preview.h"
 #include "gui/dwi/render_frame.h"
@@ -116,6 +116,7 @@ namespace MR
           if (lock_orientation_to_image_box->isChecked()) {
             const Projection* proj = window().get_current_mode()->get_current_projection();
             if (!proj) return;
+            render_frame->reset_view();
             render_frame->set_rotation (proj->modelview());
           }
         }
@@ -137,8 +138,8 @@ namespace MR
 
         void ODF_Preview::lighting_update_slot()
         {
-          // Use a dummy call that won't actually change anything, but will call updateGL() (which is protected)
-          render_frame->set_LOD (level_of_detail_selector->value());
+          // Just force a redraw - preferably something compatible with all ODF modes
+          render_frame->set_show_axes (show_axes_box->isChecked());
         }
 
 

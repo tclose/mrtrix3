@@ -1,17 +1,17 @@
 /*
- * Copyright (c) 2008-2016 the MRtrix3 contributors
- * 
+ * Copyright (c) 2008-2018 the MRtrix3 contributors.
+ *
  * This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/
- * 
- * MRtrix is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
- * 
- * For more details, see www.mrtrix.org
- * 
+ * file, you can obtain one at http://mozilla.org/MPL/2.0/
+ *
+ * MRtrix3 is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty
+ * of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.
+ *
+ * For more details, see http://www.mrtrix.org/
  */
+
 
 #include "gui/mrview/tool/connectome/connectome.h"
 
@@ -30,8 +30,7 @@
 #include "dwi/tractography/file.h"
 #include "dwi/tractography/properties.h"
 
-#include "mesh/mesh.h"
-#include "mesh/vox2mesh.h"
+#include "surface/mesh_multi.h"
 
 namespace MR
 {
@@ -49,7 +48,7 @@ namespace MR
 
         Connectome::Connectome (Dock* parent) :
             Base (parent),
-            mat2vec (0),
+            mat2vec (nullptr),
             lighting (this),
             lighting_dock (nullptr),
             node_list (new Tool::Dock ("Connectome node list")),
@@ -83,6 +82,7 @@ namespace MR
             edge_size (edge_size_t::FIXED),
             edge_alpha (edge_alpha_t::FIXED),
             have_exemplars (false),
+            have_streamtubes (false),
             edge_fixed_colour { 0.5f, 0.5f, 0.5f },
             edge_colourmap_index (1),
             edge_colourmap_invert (false),
@@ -376,6 +376,7 @@ namespace MR
           node_alpha_combobox->setToolTip (tr ("Set how node transparency is determined"));
           node_alpha_combobox->addItem ("Fixed");
           node_alpha_combobox->addItem ("Connectome");
+          node_alpha_combobox->addItem ("LUT");
           node_alpha_combobox->addItem ("Vector file");
           node_alpha_combobox->addItem ("Matrix file");
           connect (node_alpha_combobox, SIGNAL (activated(int)), this, SLOT (node_alpha_selection_slot (int)));
@@ -442,10 +443,9 @@ namespace MR
           edge_visibility_combobox->setToolTip (tr ("Set which edges are visible"));
           edge_visibility_combobox->addItem ("All");
           edge_visibility_combobox->addItem ("None");
-          edge_visibility_combobox->addItem ("By nodes");
           edge_visibility_combobox->addItem ("Connectome");
           edge_visibility_combobox->addItem ("Matrix file");
-          edge_visibility_combobox->setCurrentIndex (3);
+          edge_visibility_combobox->setCurrentIndex (2);
           connect (edge_visibility_combobox, SIGNAL (activated(int)), this, SLOT (edge_visibility_selection_slot (int)));
           gridlayout->addWidget (edge_visibility_combobox, 0, 2);
           edge_visibility_warning_icon = new QLabel();
@@ -474,8 +474,15 @@ namespace MR
           hlayout->addWidget (edge_visibility_threshold_invert_checkbox);
           gridlayout->addWidget (edge_visibility_threshold_controls, 1, 1, 1, 4);
 
+          edge_visibility_by_nodes_checkbox = new QCheckBox("Hide edges to invisible nodes");
+          edge_visibility_by_nodes_checkbox->setToolTip (tr ("Toggle whether or not an edge that connects to an invisible node (whether hidden through \"visibility\" or \"transparency\" features) should also be made invisible"));
+          edge_visibility_by_nodes_checkbox->setTristate (false);
+          edge_visibility_by_nodes_checkbox->setChecked (true);
+          connect (edge_visibility_by_nodes_checkbox, SIGNAL (stateChanged(int)), this, SLOT (edge_visibility_parameter_slot()));
+          gridlayout->addWidget (edge_visibility_by_nodes_checkbox, 2, 1, 1, 4);
+
           label = new QLabel ("Geometry: ");
-          gridlayout->addWidget (label, 2, 0, 1, 2);
+          gridlayout->addWidget (label, 3, 0, 1, 2);
           edge_geometry_combobox = new QComboBox (this);
           edge_geometry_combobox->setToolTip (tr ("The geometry used to draw each edge"));
           edge_geometry_combobox->addItem ("Line");
@@ -483,7 +490,7 @@ namespace MR
           edge_geometry_combobox->addItem ("Streamline");
           edge_geometry_combobox->addItem ("Streamtube");
           connect (edge_geometry_combobox, SIGNAL (activated(int)), this, SLOT (edge_geometry_selection_slot (int)));
-          gridlayout->addWidget (edge_geometry_combobox, 2, 2);
+          gridlayout->addWidget (edge_geometry_combobox, 3, 2);
           hlayout = new HBoxLayout;
           hlayout->setContentsMargins (0, 0, 0, 0);
           hlayout->setSpacing (0);
@@ -504,10 +511,10 @@ namespace MR
           edge_geometry_line_smooth_checkbox->setTristate (false);
           connect (edge_geometry_line_smooth_checkbox, SIGNAL (stateChanged(int)), this, SLOT(edge_size_value_slot()));
           hlayout->addWidget (edge_geometry_line_smooth_checkbox, 1);
-          gridlayout->addLayout (hlayout, 2, 3, 1, 2);
+          gridlayout->addLayout (hlayout, 3, 3, 1, 2);
 
           label = new QLabel ("Colour: ");
-          gridlayout->addWidget (label, 3, 0, 1, 2);
+          gridlayout->addWidget (label, 4, 0, 1, 2);
           edge_colour_combobox = new QComboBox (this);
           edge_colour_combobox->setToolTip (tr ("Set how the colour of each edge is determined"));
           edge_colour_combobox->addItem ("Fixed");
@@ -516,7 +523,7 @@ namespace MR
           edge_colour_combobox->addItem ("Matrix file");
           edge_colour_combobox->setCurrentIndex (2);
           connect (edge_colour_combobox, SIGNAL (activated(int)), this, SLOT (edge_colour_selection_slot (int)));
-          gridlayout->addWidget (edge_colour_combobox, 3, 2);
+          gridlayout->addWidget (edge_colour_combobox, 4, 2);
           hlayout = new HBoxLayout;
           hlayout->setContentsMargins (0, 0, 0, 0);
           hlayout->setSpacing (0);
@@ -528,7 +535,7 @@ namespace MR
           edge_colour_colourmap_button = new ColourMapButton (this, edge_colourmap_observer, false, false, true);
           edge_colour_colourmap_button->setToolTip (tr ("Select the colourmap for nodes"));
           hlayout->addWidget (edge_colour_colourmap_button, 1);
-          gridlayout->addLayout (hlayout, 3, 3, 1, 2);
+          gridlayout->addLayout (hlayout, 4, 3, 1, 2);
 
           edge_colour_range_controls = new QWidget (this);
           hlayout = new HBoxLayout;
@@ -549,17 +556,17 @@ namespace MR
           edge_colour_upper_button->setMax (std::numeric_limits<float>::max());
           connect (edge_colour_upper_button, SIGNAL (valueChanged()), this, SLOT (edge_colour_parameter_slot()));
           hlayout->addWidget (edge_colour_upper_button);
-          gridlayout->addWidget (edge_colour_range_controls, 4, 1, 1, 4);
+          gridlayout->addWidget (edge_colour_range_controls, 5, 1, 1, 4);
 
           label = new QLabel ("Size scaling: ");
-          gridlayout->addWidget (label, 5, 0, 1, 2);
+          gridlayout->addWidget (label, 6, 0, 1, 2);
           edge_size_combobox = new QComboBox (this);
           edge_size_combobox->setToolTip (tr ("Set how the width of each edge is determined"));
           edge_size_combobox->addItem ("Fixed");
           edge_size_combobox->addItem ("Connectome");
           edge_size_combobox->addItem ("Matrix file");
           connect (edge_size_combobox, SIGNAL (activated(int)), this, SLOT (edge_size_selection_slot (int)));
-          gridlayout->addWidget (edge_size_combobox, 5, 2);
+          gridlayout->addWidget (edge_size_combobox, 6, 2);
           hlayout = new HBoxLayout;
           hlayout->setContentsMargins (0, 0, 0, 0);
           hlayout->setSpacing (0);
@@ -568,7 +575,7 @@ namespace MR
           edge_size_button->setMin (0.0f);
           connect (edge_size_button, SIGNAL (valueChanged()), this, SLOT (edge_size_value_slot()));
           hlayout->addWidget (edge_size_button, 1);
-          gridlayout->addLayout (hlayout, 5, 3, 1, 2);
+          gridlayout->addLayout (hlayout, 6, 3, 1, 2);
 
           edge_size_range_controls = new QWidget (this);
           hlayout = new HBoxLayout;
@@ -594,17 +601,17 @@ namespace MR
           connect (edge_size_invert_checkbox, SIGNAL (stateChanged(int)), this, SLOT (edge_size_parameter_slot()));
           hlayout->addWidget (edge_size_invert_checkbox);
           edge_size_range_controls->setVisible (false);
-          gridlayout->addWidget (edge_size_range_controls, 6, 1, 1, 4);
+          gridlayout->addWidget (edge_size_range_controls, 7, 1, 1, 4);
 
           label = new QLabel ("Transparency: ");
-          gridlayout->addWidget (label, 7, 0, 1, 2);
+          gridlayout->addWidget (label, 8, 0, 1, 2);
           edge_alpha_combobox = new QComboBox (this);
           edge_alpha_combobox->setToolTip (tr ("Set how edge transparency is determined"));
           edge_alpha_combobox->addItem ("Fixed");
           edge_alpha_combobox->addItem ("Connectome");
           edge_alpha_combobox->addItem ("Matrix file");
           connect (edge_alpha_combobox, SIGNAL (activated(int)), this, SLOT (edge_alpha_selection_slot (int)));
-          gridlayout->addWidget (edge_alpha_combobox, 7, 2);
+          gridlayout->addWidget (edge_alpha_combobox, 8, 2);
           hlayout = new HBoxLayout;
           hlayout->setContentsMargins (0, 0, 0, 0);
           hlayout->setSpacing (0);
@@ -613,7 +620,7 @@ namespace MR
           edge_alpha_slider->setSliderPosition (1000);
           connect (edge_alpha_slider, SIGNAL (valueChanged (int)), this, SLOT (edge_alpha_value_slot (int)));
           hlayout->addWidget (edge_alpha_slider, 1);
-          gridlayout->addLayout (hlayout, 7, 3, 1, 2);
+          gridlayout->addLayout (hlayout, 8, 3, 1, 2);
 
           edge_alpha_range_controls = new QWidget (this);
           hlayout = new HBoxLayout;
@@ -639,49 +646,39 @@ namespace MR
           connect (edge_alpha_invert_checkbox, SIGNAL (stateChanged(int)), this, SLOT (edge_alpha_parameter_slot()));
           hlayout->addWidget (edge_alpha_invert_checkbox);
           edge_alpha_range_controls->setVisible (false);
-          gridlayout->addWidget (edge_alpha_range_controls, 8, 1, 1, 4);
+          gridlayout->addWidget (edge_alpha_range_controls, 9, 1, 1, 4);
 
           group_box = new QGroupBox ("Miscellaneous options");
           main_box->addWidget (group_box);
           gridlayout = new GridLayout();
           group_box->setLayout (gridlayout);
 
-          gridlayout->addWidget (new QLabel ("Config: "), 0, 0);
-          config_button = new QPushButton (this);
-          config_button->setToolTip (tr ("Open connectome config file\n"
-                                         "Provide the connectome config file used at the labelconfig\n"
-                                         "step to access the proper node names in the node list."));
-          config_button->setText ("(none)");
-          connect (config_button, SIGNAL (clicked()), this, SLOT (config_open_slot ()));
-          gridlayout->addWidget (config_button, 0, 1);
-
-          gridlayout->addWidget (new QLabel ("LUT file: "), 1, 0);
-          lut_combobox = new QComboBox (this);
-          lut_combobox->setToolTip (tr ("Open lookup table file (must select appropriate format)\n"
-                                        "If the primary parcellation image has come from an atlas that\n"
-                                        "provides a look-up table, select that file here so that MRview \n"
-                                        "can access the appropriate node colours."));
-          for (size_t index = 0; MR::Connectome::lut_format_strings[index]; ++index)
-            lut_combobox->insertItem (index, MR::Connectome::lut_format_strings[index]);
-          connect (lut_combobox, SIGNAL (activated(int)), this, SLOT (lut_open_slot (int)));
-          gridlayout->addWidget (lut_combobox, 1, 1);
+          gridlayout->addWidget (new QLabel ("LUT: "), 0, 0);
+          lut_button = new QPushButton (this);
+          lut_button->setToolTip (tr ("Open lookup table file\n"
+                                      "If the primary parcellation image has come from an atlas that\n"
+                                      "provides a look-up table, select that file here so that MRview \n"
+                                      "can access the appropriate node colours."));
+          lut_button->setText ("(none)");
+          connect (lut_button, SIGNAL (clicked()), this, SLOT (lut_open_slot ()));
+          gridlayout->addWidget (lut_button, 0, 1);
 
           lighting_checkbox = new QCheckBox ("Lighting");
           lighting_checkbox->setTristate (false);
           lighting_checkbox->setChecked (true);
           lighting_checkbox->setToolTip (tr ("Toggle whether lighting should be applied to compatible elements"));
           connect (lighting_checkbox, SIGNAL (stateChanged (int)), this, SLOT (lighting_change_slot (int)));
-          gridlayout->addWidget (lighting_checkbox, 2, 0);
+          gridlayout->addWidget (lighting_checkbox, 1, 0);
           lighting_settings_button = new QPushButton ("Settings...");
           lighting_settings_button->setToolTip (tr ("Advanced lighting configuration"));
           connect (lighting_settings_button, SIGNAL (clicked()), this, SLOT (lighting_settings_slot()));
-          gridlayout->addWidget (lighting_settings_button, 2, 1);
+          gridlayout->addWidget (lighting_settings_button, 1, 1);
           connect (&lighting, SIGNAL (changed()), SLOT (lighting_parameter_slot()));
 
           crop_to_slab_checkbox = new QCheckBox ("Crop to slab");
           crop_to_slab_checkbox->setTristate (false);
           connect (crop_to_slab_checkbox, SIGNAL (stateChanged(int)), this, SLOT (crop_to_slab_toggle_slot (int)));
-          gridlayout->addWidget (crop_to_slab_checkbox, 3, 0);
+          gridlayout->addWidget (crop_to_slab_checkbox, 2, 0);
           hlayout = new HBoxLayout;
           hlayout->setContentsMargins (0, 0, 0, 0);
           hlayout->setSpacing (0);
@@ -695,14 +692,14 @@ namespace MR
           crop_to_slab_button->setEnabled (false);
           connect (crop_to_slab_button, SIGNAL (valueChanged()), this, SLOT (crop_to_slab_parameter_slot()));
           hlayout->addWidget (crop_to_slab_button);
-          gridlayout->addLayout (hlayout, 3, 1);
+          gridlayout->addLayout (hlayout, 2, 1);
 
           show_node_list_label = new QLabel ("Node selection: ");
-          gridlayout->addWidget (show_node_list_label, 4, 0);
+          gridlayout->addWidget (show_node_list_label, 3, 0);
           show_node_list_button = new QPushButton ("Show list");
           show_node_list_button->setToolTip (tr ("Open window that displays list of nodes and enables their selection"));
           connect (show_node_list_button, SIGNAL (clicked()), this, SLOT (show_node_list_slot()));
-          gridlayout->addWidget (show_node_list_button, 4, 1);
+          gridlayout->addWidget (show_node_list_button, 3, 1);
 
           main_box->addWidget (node_list);
 
@@ -840,7 +837,7 @@ namespace MR
             + Option ("connectome.init", "Initialise the connectome tool using a parcellation image.")
             +   Argument ("image").type_image_in()
 
-            + Option ("connectome.load", "Load a matrix file into the connectome tool.")
+            + Option ("connectome.load", "Load a matrix file into the connectome tool.").allow_multiple()
             +   Argument ("path").type_file_in();
 
         }
@@ -858,7 +855,7 @@ namespace MR
           }
           if (opt.opt->is ("connectome.load")) {
             try {
-              std::vector<std::string> list (1, opt[0]);
+              vector<std::string> list (1, opt[0]);
               add_matrices (list);
             } catch (Exception& e) { e.display(); }
             return true;
@@ -899,7 +896,7 @@ namespace MR
 
         void Connectome::matrix_open_slot ()
         {
-          std::vector<std::string> list = Dialog::File::get_files (&window(), "Select connectome file(s) to open");
+          vector<std::string> list = Dialog::File::get_files (&window(), "Select connectome file(s) to open");
           if (list.empty())
             return;
           add_matrices (list);
@@ -923,7 +920,7 @@ namespace MR
             calculate_node_sizes();
           if (node_alpha == node_alpha_t::CONNECTOME)
             calculate_node_alphas();
-          if (edge_visibility == edge_visibility_t::CONNECTOME)
+          if (edge_visibility == edge_visibility_t::CONNECTOME || ((node_visibility == node_visibility_t::CONNECTOME || node_alpha == node_alpha_t::CONNECTOME) && edge_visibility_by_nodes_checkbox->isChecked()))
             calculate_edge_visibility();
           if (edge_colour == edge_colour_t::CONNECTOME)
             calculate_edge_colours();
@@ -931,6 +928,29 @@ namespace MR
             calculate_edge_sizes();
           if (edge_alpha == edge_alpha_t::CONNECTOME)
             calculate_edge_alphas();
+
+          // Also need to update limits on UI controls
+          QModelIndexList list = matrix_list_view->selectionModel()->selectedRows();
+          if (list.size()) {
+            const FileDataVector& data (matrix_list_model->get (list[0]));
+            if (node_visibility == node_visibility_t::CONNECTOME)
+              update_controls_node_visibility (data.get_min(), data.get_mean(), data.get_max());
+            if (node_colour == node_colour_t::CONNECTOME)
+              update_controls_node_colour (data.get_min(), data.get_mean(), data.get_max());
+            if (node_size == node_size_t::CONNECTOME)
+              update_controls_node_size (data.get_min(), data.get_mean(), data.get_max());
+            if (node_alpha == node_alpha_t::CONNECTOME)
+              update_controls_node_alpha (data.get_min(), data.get_mean(), data.get_max());
+            if (edge_visibility == edge_visibility_t::CONNECTOME)
+              update_controls_edge_visibility (data.get_min(), data.get_mean(), data.get_max());
+            if (edge_colour == edge_colour_t::CONNECTOME)
+              update_controls_edge_colour (data.get_min(), data.get_mean(), data.get_max());
+            if (edge_size == edge_size_t::CONNECTOME)
+              update_controls_edge_size (data.get_min(), data.get_mean(), data.get_max());
+            if (edge_alpha == edge_alpha_t::CONNECTOME)
+              update_controls_edge_alpha (data.get_min(), data.get_mean(), data.get_max());
+          }
+
           window().updateGL();
         }
 
@@ -962,17 +982,7 @@ namespace MR
               break;
             case 2:
               if (node_visibility == node_visibility_t::DEGREE) return;
-              if (edge_visibility == edge_visibility_t::VISIBLE_NODES) {
-                QMessageBox::warning (QApplication::activeWindow(),
-                                      tr ("Visualisation error"),
-                                      tr ("Cannot have node visibility based on edges; edge visibility is based on nodes!"),
-                                      QMessageBox::Ok,
-                                      QMessageBox::Ok);
-                node_visibility_combobox->setCurrentIndex (0);
-                node_visibility = node_visibility_t::ALL;
-              } else {
-                node_visibility = node_visibility_t::DEGREE;
-              }
+              node_visibility = node_visibility_t::DEGREE;
               node_visibility_combobox->removeItem (6);
               node_visibility_matrix_operator_combobox->setVisible (false);
               node_visibility_threshold_controls->setVisible (false);
@@ -1065,6 +1075,8 @@ namespace MR
               return;
           }
           calculate_node_visibility();
+          if (edge_visibility_by_nodes_checkbox->isChecked())
+            calculate_edge_visibility();
           window().updateGL();
         }
 
@@ -1418,14 +1430,14 @@ namespace MR
             case 0:
               if (node_alpha == node_alpha_t::FIXED) return;
               node_alpha = node_alpha_t::FIXED;
-              node_alpha_combobox->removeItem (4);
+              node_alpha_combobox->removeItem (5);
               node_alpha_matrix_operator_combobox->setVisible (false);
               node_alpha_range_controls->setVisible (false);
               break;
             case 1:
               if (node_alpha == node_alpha_t::CONNECTOME) return;
               node_alpha = node_alpha_t::CONNECTOME;
-              node_alpha_combobox->removeItem (4);
+              node_alpha_combobox->removeItem (5);
               node_alpha_matrix_operator_combobox->setVisible (true);
               if (selected_node_count >= 2) {
                 node_alpha_matrix_operator_combobox->removeItem (4);
@@ -1455,40 +1467,49 @@ namespace MR
               node_alpha_invert_checkbox->setChecked (false);
               break;
             case 2:
+              if (node_alpha == node_alpha_t::FROM_LUT) return;
+              node_alpha = node_alpha_t::FROM_LUT;
+              node_alpha_combobox->removeItem (5);
+              node_alpha_matrix_operator_combobox->setVisible (false);
+              node_alpha_range_controls->setVisible (false);
+              break;
+            case 3:
               if (!import_vector_file (node_values_from_file_alpha, "node transparency")) {
                 switch (node_alpha) {
                   case node_alpha_t::FIXED:       node_alpha_combobox->setCurrentIndex (0); return;
                   case node_alpha_t::CONNECTOME:  node_alpha_combobox->setCurrentIndex (1); return;
-                  case node_alpha_t::VECTOR_FILE: node_alpha_combobox->setCurrentIndex (4); return;
-                  case node_alpha_t::MATRIX_FILE: node_alpha_combobox->setCurrentIndex (4); return;
+                  case node_alpha_t::FROM_LUT:    node_alpha_combobox->setCurrentIndex (2); return;
+                  case node_alpha_t::VECTOR_FILE: node_alpha_combobox->setCurrentIndex (5); return;
+                  case node_alpha_t::MATRIX_FILE: node_alpha_combobox->setCurrentIndex (5); return;
                 }
               }
               node_alpha = node_alpha_t::VECTOR_FILE;
-              if (node_alpha_combobox->count() == 4)
+              if (node_alpha_combobox->count() == 5)
                 node_alpha_combobox->addItem (node_values_from_file_alpha.get_name());
               else
-                node_alpha_combobox->setItemText (4, node_values_from_file_alpha.get_name());
-              node_alpha_combobox->setCurrentIndex (4);
+                node_alpha_combobox->setItemText (5, node_values_from_file_alpha.get_name());
+              node_alpha_combobox->setCurrentIndex (5);
               node_alpha_matrix_operator_combobox->setVisible (false);
               node_alpha_range_controls->setVisible (true);
               update_controls_node_alpha (node_values_from_file_alpha.get_min(), node_values_from_file_alpha.get_mean(), node_values_from_file_alpha.get_max());
               node_alpha_invert_checkbox->setChecked (false);
               break;
-            case 3:
+            case 4:
               if (!import_matrix_file (node_values_from_file_alpha, "node transparency")) {
                 switch (node_alpha) {
                   case node_alpha_t::FIXED:       node_alpha_combobox->setCurrentIndex (0); return;
                   case node_alpha_t::CONNECTOME:  node_alpha_combobox->setCurrentIndex (1); return;
-                  case node_alpha_t::VECTOR_FILE: node_alpha_combobox->setCurrentIndex (4); return;
-                  case node_alpha_t::MATRIX_FILE: node_alpha_combobox->setCurrentIndex (4); return;
+                  case node_alpha_t::FROM_LUT:    node_alpha_combobox->setCurrentIndex (2); return;
+                  case node_alpha_t::VECTOR_FILE: node_alpha_combobox->setCurrentIndex (5); return;
+                  case node_alpha_t::MATRIX_FILE: node_alpha_combobox->setCurrentIndex (5); return;
                 }
               }
               node_alpha = node_alpha_t::MATRIX_FILE;
-              if (node_alpha_combobox->count() == 4)
+              if (node_alpha_combobox->count() == 5)
                 node_alpha_combobox->addItem (node_values_from_file_alpha.get_name());
               else
-                node_alpha_combobox->setItemText (4, node_values_from_file_alpha.get_name());
-              node_alpha_combobox->setCurrentIndex (4);
+                node_alpha_combobox->setItemText (5, node_values_from_file_alpha.get_name());
+              node_alpha_combobox->setCurrentIndex (5);
               node_alpha_matrix_operator_combobox->setVisible (true);
               if (selected_node_count >= 2) {
                 node_alpha_matrix_operator_combobox->removeItem (4);
@@ -1509,12 +1530,14 @@ namespace MR
               update_controls_node_alpha (node_values_from_file_alpha.get_min(), node_values_from_file_alpha.get_mean(), node_values_from_file_alpha.get_max());
               node_alpha_invert_checkbox->setChecked (false);
               break;
-            case 4:
+            case 5:
               return;
           }
           if (node_visibility == node_visibility_t::NONE)
             node_visibility_warning_icon->setVisible (true);
           calculate_node_alphas();
+          if (edge_visibility_by_nodes_checkbox->isChecked())
+            calculate_edge_visibility();
           window().updateGL();
         }
 
@@ -1528,11 +1551,15 @@ namespace MR
             default: assert (0); break;
           }
           calculate_node_visibility();
+          if (edge_visibility_by_nodes_checkbox->isChecked())
+            calculate_edge_visibility();
           window().updateGL();
         }
         void Connectome::node_visibility_parameter_slot()
         {
           calculate_node_visibility();
+          if (edge_visibility_by_nodes_checkbox->isChecked())
+            calculate_edge_visibility();
           window().updateGL();
         }
         void Connectome::sphere_lod_slot (int value)
@@ -1570,12 +1597,7 @@ namespace MR
         }
         void Connectome::node_colour_parameter_slot()
         {
-          node_colour_lower_button->blockSignals (true);
-          node_colour_upper_button->blockSignals (true);
-          node_colour_lower_button->setMax (node_colour_upper_button->value());
-          node_colour_upper_button->setMin (node_colour_lower_button->value());
-          node_colour_lower_button->blockSignals (false);
-          node_colour_upper_button->blockSignals (false);
+          limit_min_max_controls (node_colour_lower_button, node_colour_upper_button);
           calculate_node_colours();
           window().updateGL();
         }
@@ -1598,12 +1620,7 @@ namespace MR
         }
         void Connectome::node_size_parameter_slot()
         {
-          node_size_lower_button->blockSignals (true);
-          node_size_upper_button->blockSignals (true);
-          node_size_lower_button->setMax (node_size_upper_button->value());
-          node_size_upper_button->setMin (node_size_lower_button->value());
-          node_size_lower_button->blockSignals (false);
-          node_size_upper_button->blockSignals (false);
+          limit_min_max_controls (node_size_lower_button, node_size_upper_button);
           calculate_node_sizes();
           window().updateGL();
         }
@@ -1617,6 +1634,8 @@ namespace MR
             default: assert (0); break;
           }
           calculate_node_alphas();
+          if (edge_visibility_by_nodes_checkbox->isChecked())
+            calculate_edge_visibility();
           window().updateGL();
         }
         void Connectome::node_alpha_value_slot (int position)
@@ -1628,13 +1647,10 @@ namespace MR
         }
         void Connectome::node_alpha_parameter_slot()
         {
-          node_alpha_lower_button->blockSignals (true);
-          node_alpha_upper_button->blockSignals (true);
-          node_alpha_lower_button->setMax (node_alpha_upper_button->value());
-          node_alpha_upper_button->setMin (node_alpha_lower_button->value());
-          node_alpha_lower_button->blockSignals (false);
-          node_alpha_upper_button->blockSignals (false);
+          limit_min_max_controls (node_alpha_lower_button, node_alpha_upper_button);
           calculate_node_alphas();
+          if (edge_visibility_by_nodes_checkbox->isChecked())
+            calculate_edge_visibility();
           window().updateGL();
         }
 
@@ -1651,35 +1667,19 @@ namespace MR
             case 0:
               if (edge_visibility == edge_visibility_t::ALL) return;
               edge_visibility = edge_visibility_t::ALL;
-              edge_visibility_combobox->removeItem (5);
+              edge_visibility_combobox->removeItem (4);
               edge_visibility_threshold_controls->setVisible (false);
               break;
             case 1:
               if (edge_visibility == edge_visibility_t::NONE) return;
               edge_visibility = edge_visibility_t::NONE;
-              edge_visibility_combobox->removeItem (5);
+              edge_visibility_combobox->removeItem (4);
               edge_visibility_threshold_controls->setVisible (false);
               break;
             case 2:
-              if (edge_visibility == edge_visibility_t::VISIBLE_NODES) return;
-              if (node_visibility == node_visibility_t::DEGREE) {
-                QMessageBox::warning (QApplication::activeWindow(),
-                                      tr ("Visualisation error"),
-                                      tr ("Cannot have edge visibility based on nodes; node visibility is based on edges!"),
-                                      QMessageBox::Ok,
-                                      QMessageBox::Ok);
-                edge_visibility_combobox->setCurrentIndex (1);
-                edge_visibility = edge_visibility_t::NONE;
-              } else {
-                edge_visibility = edge_visibility_t::VISIBLE_NODES;
-              }
-              edge_visibility_combobox->removeItem (5);
-              edge_visibility_threshold_controls->setVisible (false);
-              break;
-            case 3:
               if (edge_visibility == edge_visibility_t::CONNECTOME) return;
               edge_visibility = edge_visibility_t::CONNECTOME;
-              edge_visibility_combobox->removeItem (5);
+              edge_visibility_combobox->removeItem (4);
               edge_visibility_threshold_controls->setVisible (true);
               {
                 float min = 0.0f, mean = 0.0f, max = 0.0f;
@@ -1691,22 +1691,21 @@ namespace MR
                 update_controls_edge_visibility (min, mean, max);
               }
               break;
-            case 4:
+            case 3:
               if (!import_matrix_file (edge_values_from_file_visibility, "edge visibility")) {
                 switch (edge_visibility) {
                   case edge_visibility_t::ALL:           edge_visibility_combobox->setCurrentIndex (0); return;
                   case edge_visibility_t::NONE:          edge_visibility_combobox->setCurrentIndex (1); return;
-                  case edge_visibility_t::VISIBLE_NODES: edge_visibility_combobox->setCurrentIndex (2); return;
-                  case edge_visibility_t::CONNECTOME:    edge_visibility_combobox->setCurrentIndex (3); return;
-                  case edge_visibility_t::MATRIX_FILE:   edge_visibility_combobox->setCurrentIndex (5); return;
+                  case edge_visibility_t::CONNECTOME:    edge_visibility_combobox->setCurrentIndex (2); return;
+                  case edge_visibility_t::MATRIX_FILE:   edge_visibility_combobox->setCurrentIndex (4); return;
                 }
               }
               edge_visibility = edge_visibility_t::MATRIX_FILE;
-              if (edge_visibility_combobox->count() == 5)
+              if (edge_visibility_combobox->count() == 4)
                 edge_visibility_combobox->addItem (edge_values_from_file_visibility.get_name());
               else
-                edge_visibility_combobox->setItemText (5, edge_values_from_file_visibility.get_name());
-              edge_visibility_combobox->setCurrentIndex (5);
+                edge_visibility_combobox->setItemText (4, edge_values_from_file_visibility.get_name());
+              edge_visibility_combobox->setCurrentIndex (4);
               edge_visibility_threshold_controls->setVisible (true);
               update_controls_edge_visibility (edge_values_from_file_visibility.get_min(), edge_values_from_file_visibility.get_mean(), edge_values_from_file_visibility.get_max());
               break;
@@ -1981,12 +1980,7 @@ namespace MR
         }
         void Connectome::edge_colour_parameter_slot()
         {
-          edge_colour_lower_button->blockSignals (true);
-          edge_colour_upper_button->blockSignals (true);
-          edge_colour_lower_button->setMax (edge_colour_upper_button->value());
-          edge_colour_upper_button->setMin (edge_colour_lower_button->value());
-          edge_colour_lower_button->blockSignals (false);
-          edge_colour_upper_button->blockSignals (false);
+          limit_min_max_controls (edge_colour_lower_button, edge_colour_upper_button);
           calculate_edge_colours();
           window().updateGL();
         }
@@ -1997,12 +1991,7 @@ namespace MR
         }
         void Connectome::edge_size_parameter_slot()
         {
-          edge_size_lower_button->blockSignals (true);
-          edge_size_upper_button->blockSignals (true);
-          edge_size_lower_button->setMax (edge_size_upper_button->value());
-          edge_size_upper_button->setMin (edge_size_lower_button->value());
-          edge_size_lower_button->blockSignals (false);
-          edge_size_upper_button->blockSignals (false);
+          limit_min_max_controls (edge_size_lower_button, edge_size_upper_button);
           calculate_edge_sizes();
           window().updateGL();
         }
@@ -2013,12 +2002,7 @@ namespace MR
         }
         void Connectome::edge_alpha_parameter_slot()
         {
-          edge_alpha_lower_button->blockSignals (true);
-          edge_alpha_upper_button->blockSignals (true);
-          edge_alpha_lower_button->setMax (edge_alpha_upper_button->value());
-          edge_alpha_upper_button->setMin (edge_alpha_lower_button->value());
-          edge_alpha_lower_button->blockSignals (false);
-          edge_alpha_upper_button->blockSignals (false);
+          limit_min_max_controls (edge_alpha_lower_button, edge_alpha_upper_button);
           calculate_edge_alphas();
           window().updateGL();
         }
@@ -2030,61 +2014,25 @@ namespace MR
 
 
 
-        void Connectome::config_open_slot()
+        void Connectome::lut_open_slot ()
         {
-          const std::string path = Dialog::File::get_file (this, "Select connectome configuration file", "Text files (*.txt)");
+          const std::string path = Dialog::File::get_file (this, std::string("Select lookup table file"));
           if (path.empty())
             return;
-          config.clear();
-          lut_mapping.clear();
-          config_button->setText ("(none)");
+          if (lut.size()) {
+            lut.clear();
+            lut_button->blockSignals (true);
+            lut_button->setText ("(none)");
+            lut_button->blockSignals (false);
+          }
           try {
-            MR::Connectome::load_config (path, config);
-            config_button->setText (QString::fromStdString (Path::basename (path)));
+            lut.load (path);
+            lut_button->setText (QString::fromStdString (Path::basename (path)));
           } catch (Exception& e) {
             e.display();
-            config.clear();
+            return;
           }
           load_properties();
-          window().updateGL();
-        }
-        void Connectome::lut_open_slot (int index)
-        {
-          if (index == 5)
-            return; // Selected currently-open LUT; nothing to do
-          if (!index) {
-            lut.clear();
-            lut_mapping.clear();
-            lut_combobox->removeItem (5);
-          } else {
-            const std::string path = Dialog::File::get_file (this, std::string("Select lookup table file (in ") + MR::Connectome::lut_format_strings[index] + " format)", "Text files (*.txt)");
-            if (path.empty()) {
-              if (lut_combobox->count() == 6) {
-                lut_combobox->setCurrentIndex (5);
-              } else {
-                lut.clear();
-                lut_mapping.clear();
-                lut_combobox->setCurrentIndex (0);
-              }
-            } else {
-              lut.clear();
-              lut_mapping.clear();
-              lut_combobox->removeItem (5);
-              try {
-                switch (index) {
-                  case 1: lut.load (path, MR::Connectome::LUT_BASIC);      break;
-                  case 2: lut.load (path, MR::Connectome::LUT_FREESURFER); break;
-                  case 3: lut.load (path, MR::Connectome::LUT_AAL);        break;
-                  case 4: lut.load (path, MR::Connectome::LUT_ITKSNAP);    break;
-                  default: assert (0);
-                }
-                lut_combobox->insertItem (5, QString::fromStdString (Path::basename (path)));
-                lut_combobox->setCurrentIndex (5);
-              } catch (Exception& e) { e.display(); lut.clear(); lut_mapping.clear(); lut_combobox->setCurrentIndex (0); return; }
-            }
-          }
-          load_properties();
-          calculate_node_colours();
           window().updateGL();
         }
         void Connectome::lighting_change_slot (int /*value*/)
@@ -2139,9 +2087,7 @@ namespace MR
         void Connectome::clear_all()
         {
           image_button ->setText ("");
-          lut_combobox->removeItem (5);
-          lut_combobox->setCurrentIndex (0);
-          config_button->setText ("(none)");
+          lut_button->setText ("(none)");
           matrix_list_model->clear();
           selected_nodes.resize (0);
           selected_node_count = 0;
@@ -2190,8 +2136,6 @@ namespace MR
           nodes.clear();
           edges.clear();
           lut.clear();
-          config.clear();
-          lut_mapping.clear();
           if (node_overlay)
             delete node_overlay.release();
           node_values_from_file_visibility.clear();
@@ -2209,8 +2153,7 @@ namespace MR
 
         void Connectome::enable_all (const bool value)
         {
-          lut_combobox->setEnabled (value);
-          config_button->setEnabled (value);
+          lut_button->setEnabled (value);
 
           lighting_checkbox->setEnabled (value);
           lighting_settings_button->setEnabled (value);
@@ -2292,9 +2235,9 @@ namespace MR
             buffer.reset (new MR::Image<node_t> (H.get_image<node_t>().with_direct_io()));
           }
           MR::Transform transform (H);
-          std::vector<Eigen::Vector3f> node_coms;
-          std::vector<size_t> node_volumes;
-          std::vector<Eigen::Array3i> node_lower_corners, node_upper_corners;
+          vector<Eigen::Vector3f> node_coms;
+          vector<size_t> node_volumes;
+          vector<Eigen::Array3i> node_lower_corners, node_upper_corners;
           size_t max_index = 0;
 
           {
@@ -2333,7 +2276,7 @@ namespace MR
             for (size_t node_index = 1; node_index <= max_index; ++node_index) {
               if (node_volumes[node_index]) {
 
-                std::vector<int> from (3), dim (3);
+                vector<int> from (3), dim (3);
                 for (size_t axis = 0; axis != 3; ++axis) {
                   from[axis] = node_lower_corners[node_index][axis];
                   dim[axis] = node_upper_corners[node_index][axis] - node_lower_corners[node_index][axis] + 1;
@@ -2352,19 +2295,19 @@ namespace MR
             }
           }
 
-          mat2vec = MR::Connectome::Mat2Vec (num_nodes());
+          mat2vec.reset (new MR::Connectome::Mat2Vec (num_nodes()));
 
           edges.clear();
-          edges.reserve (mat2vec.vec_size());
-          for (size_t edge_index = 0; edge_index != mat2vec.vec_size(); ++edge_index) {
-            const node_t one = mat2vec(edge_index).first + 1;
-            const node_t two = mat2vec(edge_index).second + 1;
+          edges.reserve (mat2vec->vec_size());
+          for (size_t edge_index = 0; edge_index != mat2vec->vec_size(); ++edge_index) {
+            const node_t one = (*mat2vec)(edge_index).first + 1;
+            const node_t two = (*mat2vec)(edge_index).second + 1;
             edges.push_back (Edge (one, two, nodes[one].get_com(), nodes[two].get_com()));
           }
 
           // Construct the node overlay image
           MR::Header H_overlay (H);
-          H_overlay.set_ndim (4);
+          H_overlay.ndim() = 4;
           H_overlay.size (3) = 4; // RGBA
           H_overlay.stride (0) = 2;
           H_overlay.stride (1) = 3;
@@ -2379,15 +2322,17 @@ namespace MR
           dynamic_cast<Node_list*>(node_list->tool)->initialize();
         }
 
-        void Connectome::add_matrices (const std::vector<std::string>& list)
+        void Connectome::add_matrices (const vector<std::string>& list)
         {
-          std::vector<FileDataVector> data;
+          vector<FileDataVector> data;
           for (size_t i = 0; i < list.size(); ++i) {
             try {
               MR::Connectome::matrix_type matrix = MR::load_matrix<default_type> (list[i]);
-              MR::Connectome::verify_matrix (matrix, num_nodes());
+              MR::Connectome::to_upper (matrix);
+              if (matrix.rows() != num_nodes())
+                throw Exception ("Matrix file \"" + Path::basename(list[i]) + "\" is incorrect size");
               FileDataVector temp;
-              mat2vec (matrix, temp);
+              mat2vec->M2V (matrix, temp);
               temp.calc_stats();
               temp.set_name (list[i]);
               data.push_back (std::move (temp));
@@ -2777,13 +2722,14 @@ namespace MR
           MR::Connectome::matrix_type temp;
           try {
             temp = MR::load_matrix<default_type> (path);
-            MR::Connectome::verify_matrix (temp, num_nodes());
+            MR::Connectome::to_upper (temp);
+            if (temp.rows() != num_nodes())
+              throw Exception ("Matrix file \"" + Path::basename(path) + "\" is incorrect size");
           } catch (Exception& e) {
             e.display();
             return false;
           }
-          data.clear();
-          mat2vec (temp, data);
+          mat2vec->M2V (temp, data);
           data.calc_stats();
           data.set_name (Path::basename (path));
           return true;
@@ -2796,48 +2742,26 @@ namespace MR
 
         void Connectome::load_properties()
         {
-          lut_mapping.clear();
-          if (lut.size()) {
-
-            lut_mapping.push_back (lut.end());
+          if (lut.empty()) {
+            // Create LUT entries for nodes with non-zero volume
             for (node_t node_index = 1; node_index <= num_nodes(); ++node_index) {
-
-              if (config.size()) {
-                const std::string name = config[node_index];
+              if (nodes[node_index].get_volume()) {
+                const std::string name = "Node " + str(node_index);
                 nodes[node_index].set_name (name);
-                Node_map::const_iterator it;
-                for (it = lut.begin(); it != lut.end() && it->second.get_name() != name; ++it);
-                lut_mapping.push_back (it);
-
-              } else { // LUT, but no config file
-
-                const auto it = lut.find (node_index);
-                if (it == lut.end())
-                  nodes[node_index].set_name ("Node " + str(node_index));
-                else
-                  nodes[node_index].set_name (it->second.get_name());
-                lut_mapping.push_back (it);
-
+                lut.insert (std::make_pair (node_index, MR::Connectome::LUT_node (name)));
               }
-
-            } // End looping over all nodes when LUT is present
-
-          } else { // No LUT
-
-            if (config.size()) {
-
-              for (node_t node_index = 1; node_index <= num_nodes(); ++node_index)
-                nodes[node_index].set_name (config[node_index]);
-
-            } else {
-
-              // Just name nodes according to their indices
-              lut_mapping.assign (num_nodes()+1, lut.end());
-              for (node_t node_index = 1; node_index <= num_nodes(); ++node_index)
-                nodes[node_index].set_name ("Node " + str(node_index));
-
             }
-
+          } else {
+            // Load the node names from the LUT
+            // Other properties will only be pulled from the LUT if requested
+            for (node_t node_index = 1; node_index <= num_nodes(); ++node_index) {
+              const size_t count = lut.count (node_index);
+              if (count) {
+                if (count > 1)
+                  throw Exception ("Duplicate entries in lookup table file for index " + str(node_index));
+                nodes[node_index].set_name (lut.find(node_index)->second.get_name());
+              }
+            }
           }
 
           calculate_node_visibility();
@@ -2849,7 +2773,6 @@ namespace MR
           calculate_edge_colours();
           calculate_edge_sizes();
           calculate_edge_alphas();
-
         }
 
 
@@ -2894,7 +2817,7 @@ namespace MR
                 bool any = false, all = true;
                 for (node_t j = 1; j <= num_nodes(); ++j) {
                   if (selected_nodes[j]) {
-                    const float value = data[mat2vec (i-1, j-1)];
+                    const float value = data[(*mat2vec) (i-1, j-1)];
                     if (value >= threshold)
                       any = true;
                     else
@@ -2933,7 +2856,7 @@ namespace MR
                 bool any = false, all = true;
                 for (node_t j = 1; j <= num_nodes(); ++j) {
                   if (selected_nodes[j]) {
-                    const float value = node_values_from_file_visibility[mat2vec (i-1, j-1)];
+                    const float value = node_values_from_file_visibility[(*mat2vec) (i-1, j-1)];
                     if (value >= threshold)
                       any = true;
                     else
@@ -2952,8 +2875,6 @@ namespace MR
 
           }
           update_node_overlay();
-          if (edge_visibility == edge_visibility_t::VISIBLE_NODES)
-            calculate_edge_visibility();
         }
 
         void Connectome::calculate_node_colours()
@@ -2978,10 +2899,11 @@ namespace MR
 
             if (lut.size()) {
               for (node_t node_index = 1; node_index <= num_nodes(); ++node_index) {
-                if (lut_mapping[node_index] == lut.end())
+                const LUT::const_iterator i = lut.find (node_index);
+                if (i == lut.end())
                   nodes[node_index].set_colour (node_fixed_colour);
                 else
-                  nodes[node_index].set_colour (Eigen::Array3f (lut_mapping[node_index]->second.get_colour().cast<float>()) / 255.0f);
+                  nodes[node_index].set_colour (Eigen::Array3f (i->second.get_colour().cast<float>()) / 255.0f);
               }
             } else {
               for (auto i = nodes.begin(); i != nodes.end(); ++i)
@@ -3002,7 +2924,7 @@ namespace MR
                   float min = std::numeric_limits<float>::infinity(), sum = 0.0f, max = -std::numeric_limits<float>::infinity();
                   for (node_t j = 1; j <= num_nodes(); ++j) {
                     if (selected_nodes[j]) {
-                      const float value = data[mat2vec (i-1, j-1)];
+                      const float value = data[(*mat2vec) (i-1, j-1)];
                       min = std::min (min, value);
                       sum += value;
                       max = std::max (max, value);
@@ -3057,7 +2979,7 @@ namespace MR
                   float min = std::numeric_limits<float>::infinity(), sum = 0.0f, max = -std::numeric_limits<float>::infinity();
                   for (node_t j = 1; j <= num_nodes(); ++j) {
                     if (selected_nodes[j]) {
-                      const float value = node_values_from_file_colour[mat2vec (i-1, j-1)];
+                      const float value = node_values_from_file_colour[(*mat2vec) (i-1, j-1)];
                       min = std::min (min, value);
                       sum += value;
                       max = std::max (max, value);
@@ -3118,7 +3040,7 @@ namespace MR
                   float min = std::numeric_limits<float>::infinity(), sum = 0.0f, max = -std::numeric_limits<float>::infinity();
                   for (node_t j = 1; j <= num_nodes(); ++j) {
                     if (selected_nodes[j]) {
-                      const float value = data[mat2vec (i-1, j-1)];
+                      const float value = data[(*mat2vec) (i-1, j-1)];
                       min = std::min (min, value);
                       sum += value;
                       max = std::max (max, value);
@@ -3172,7 +3094,7 @@ namespace MR
                   float min = std::numeric_limits<float>::infinity(), sum = 0.0f, max = -std::numeric_limits<float>::infinity();
                   for (node_t j = 1; j <= num_nodes(); ++j) {
                     if (selected_nodes[j]) {
-                      const float value = node_values_from_file_size[mat2vec (i-1, j-1)];
+                      const float value = node_values_from_file_size[(*mat2vec) (i-1, j-1)];
                       min = std::min (min, value);
                       sum += value;
                       max = std::max (max, value);
@@ -3222,7 +3144,7 @@ namespace MR
                   float min = std::numeric_limits<float>::infinity(), sum = 0.0f, max = -std::numeric_limits<float>::infinity();
                   for (node_t j = 1; j <= num_nodes(); ++j) {
                     if (selected_nodes[j]) {
-                      const float value = data[mat2vec (i-1, j-1)];
+                      const float value = data[(*mat2vec) (i-1, j-1)];
                       min = std::min (min, value);
                       sum += value;
                       max = std::max (max, value);
@@ -3246,6 +3168,21 @@ namespace MR
             } else {
               for (node_t i = 1; i <= num_nodes(); ++i)
                 nodes[i].set_alpha (1.0f);
+            }
+
+          } else if (node_alpha == node_alpha_t::FROM_LUT) {
+
+            if (lut.size()) {
+              for (node_t node_index = 1; node_index <= num_nodes(); ++node_index) {
+                const LUT::const_iterator i = lut.find (node_index);
+                if (i == lut.end())
+                  nodes[node_index].set_alpha (node_fixed_alpha);
+                else
+                  nodes[node_index].set_alpha (i->second.get_alpha() / 255.0f);
+              }
+            } else {
+              for (auto i = nodes.begin(); i != nodes.end(); ++i)
+                i->set_alpha (node_fixed_alpha);
             }
 
           } else if (node_alpha == node_alpha_t::VECTOR_FILE) {
@@ -3273,7 +3210,7 @@ namespace MR
                   float min = std::numeric_limits<float>::infinity(), sum = 0.0f, max = -std::numeric_limits<float>::infinity();
                   for (node_t j = 1; j <= num_nodes(); ++j) {
                     if (selected_nodes[j]) {
-                      const float value = node_values_from_file_alpha[mat2vec (i-1, j-1)];
+                      const float value = node_values_from_file_alpha[(*mat2vec) (i-1, j-1)];
                       min = std::min (min, value);
                       sum += value;
                       max = std::max (max, value);
@@ -3360,11 +3297,6 @@ namespace MR
             for (auto i = edges.begin(); i != edges.end(); ++i)
               i->set_visible (false);
 
-          } else if (edge_visibility == edge_visibility_t::VISIBLE_NODES) {
-
-            for (auto i = edges.begin(); i != edges.end(); ++i)
-              i->set_visible (!i->is_diagonal() && nodes[i->get_node_index(0)].to_draw() && nodes[i->get_node_index(1)].to_draw());
-
           } else if (edge_visibility == edge_visibility_t::CONNECTOME) {
 
             QModelIndexList list = matrix_list_view->selectionModel()->selectedRows();
@@ -3400,6 +3332,14 @@ namespace MR
             }
 
           }
+
+          if (edge_visibility_by_nodes_checkbox->isChecked()) {
+            for (auto i = edges.begin(); i != edges.end(); ++i) {
+              if (!(nodes[i->get_node_index(0)].to_draw() && nodes[i->get_node_index(1)].to_draw()))
+                i->set_visible (false);
+            }
+          }
+
           if (node_visibility == node_visibility_t::DEGREE)
             calculate_node_visibility();
         }
@@ -3414,7 +3354,7 @@ namespace MR
           } else if (edge_colour == edge_colour_t::DIRECTION) {
 
             for (auto i = edges.begin(); i != edges.end(); ++i)
-              i->set_colour (Eigen::Array3f { std::abs (i->get_dir()[0]), std::abs (i->get_dir()[1]), std::abs (i->get_dir()[2]) } );
+              i->set_colour (Eigen::Array3f { abs (i->get_dir()[0]), abs (i->get_dir()[1]), abs (i->get_dir()[2]) } );
 
           } else if (edge_colour == edge_colour_t::CONNECTOME) {
 
@@ -3538,11 +3478,11 @@ namespace MR
 
 
 
-        void Connectome::node_selection_changed (const std::vector<node_t>& list)
+        void Connectome::node_selection_changed (const vector<node_t>& list)
         {
           selected_nodes.clear();
           selected_node_count = list.size();
-          for (std::vector<node_t>::const_iterator n = list.begin(); n != list.end(); ++n)
+          for (vector<node_t>::const_iterator n = list.begin(); n != list.end(); ++n)
             selected_nodes[*n] = true;
           if (node_visibility == node_visibility_t::CONNECTOME || node_visibility == node_visibility_t::MATRIX_FILE) {
             if (selected_node_count >= 2) {
@@ -3559,6 +3499,8 @@ namespace MR
               node_visibility_matrix_operator_combobox->setEnabled (false);
             }
             calculate_node_visibility();
+            if (edge_visibility_by_nodes_checkbox->isChecked())
+              calculate_edge_visibility();
           }
           if (node_colour == node_colour_t::CONNECTOME || node_colour == node_colour_t::MATRIX_FILE) {
             if (selected_node_count >= 2) {
@@ -3613,6 +3555,8 @@ namespace MR
               node_alpha_matrix_operator_combobox->setEnabled (false);
             }
             calculate_node_alphas();
+            if (edge_visibility_by_nodes_checkbox->isChecked())
+              calculate_edge_visibility();
           }
           window().updateGL();
         }
@@ -3755,71 +3699,73 @@ namespace MR
 
         void Connectome::update_controls_node_visibility (const float min, const float mean, const float max)
         {
-          node_visibility_threshold_button->setRate (0.001 * (max - min));
-          node_visibility_threshold_button->setMin (min);
-          node_visibility_threshold_button->setMax (max);
-          node_visibility_threshold_button->setValue (mean);
+          update_control (node_visibility_threshold_button, min, mean, max);
         }
         void Connectome::update_controls_node_colour     (const float min, const float mean, const float max)
         {
-          node_colour_lower_button->setValue (min);
-          node_colour_upper_button->setValue (max);
-          node_colour_lower_button->setMax (max);
-          node_colour_upper_button->setMin (min);
-          node_colour_lower_button->setRate (0.01f * (mean - min));
-          node_colour_upper_button->setRate (0.01f * (max - mean));
+          update_controls (node_colour_lower_button, node_colour_upper_button, min, mean, max);
         }
         void Connectome::update_controls_node_size       (const float min, const float mean, const float max)
         {
-          node_size_lower_button->setValue (min);
-          node_size_upper_button->setValue (max);
-          node_size_lower_button->setMax (max);
-          node_size_upper_button->setMin (min);
-          node_size_lower_button->setRate (0.01f * (mean - min));
-          node_size_upper_button->setRate (0.01f * (max - mean));
+          update_controls (node_size_lower_button, node_size_upper_button, min, mean, max);
         }
         void Connectome::update_controls_node_alpha      (const float min, const float mean, const float max)
         {
-          node_alpha_lower_button->setValue (min);
-          node_alpha_upper_button->setValue (max);
-          node_alpha_lower_button->setMax (max);
-          node_alpha_upper_button->setMin (min);
-          node_alpha_lower_button->setRate (0.01f * (mean - min));
-          node_alpha_upper_button->setRate (0.01f * (max - mean));
+          update_controls (node_alpha_lower_button, node_alpha_upper_button, min, mean, max);
         }
         void Connectome::update_controls_edge_visibility (const float min, const float mean, const float max)
         {
-          edge_visibility_threshold_button->setRate (0.001 * (max - min));
-          edge_visibility_threshold_button->setMin (min);
-          edge_visibility_threshold_button->setMax (max);
-          edge_visibility_threshold_button->setValue (mean);
+          update_control (edge_visibility_threshold_button, min, mean, max);
         }
         void Connectome::update_controls_edge_colour     (const float min, const float mean, const float max)
         {
-          edge_colour_lower_button->setValue (min);
-          edge_colour_upper_button->setValue (max);
-          edge_colour_lower_button->setMax (max);
-          edge_colour_upper_button->setMin (min);
-          edge_colour_lower_button->setRate (0.01f * (mean - min));
-          edge_colour_upper_button->setRate (0.01f * (max - mean));
+          update_controls (edge_colour_lower_button, edge_colour_upper_button, min, mean, max);
         }
         void Connectome::update_controls_edge_size       (const float min, const float mean, const float max)
         {
-          edge_size_lower_button->setValue (min);
-          edge_size_upper_button->setValue (max);
-          edge_size_lower_button->setMax (max);
-          edge_size_upper_button->setMin (min);
-          edge_size_lower_button->setRate (0.01f * (mean - min));
-          edge_size_upper_button->setRate (0.01f * (max - mean));
+          update_controls (edge_size_lower_button, edge_size_upper_button, min, mean, max);
         }
         void Connectome::update_controls_edge_alpha      (const float min, const float mean, const float max)
         {
-          edge_alpha_lower_button->setValue (min);
-          edge_alpha_upper_button->setValue (max);
-          edge_alpha_lower_button->setMax (max);
-          edge_alpha_upper_button->setMin (min);
-          edge_alpha_lower_button->setRate (0.01f * (mean - min));
-          edge_alpha_upper_button->setRate (0.01f * (max - mean));
+          update_controls (edge_alpha_lower_button, edge_alpha_upper_button, min, mean, max);
+        }
+
+
+
+
+
+
+
+
+        void Connectome::limit_min_max_controls (AdjustButton* const lower_button, AdjustButton* const upper_button) const
+        {
+          lower_button->blockSignals (true);
+          upper_button->blockSignals (true);
+          lower_button->setMax (upper_button->value());
+          upper_button->setMin (lower_button->value());
+          lower_button->blockSignals (false);
+          upper_button->blockSignals (false);
+        }
+
+
+
+
+        void Connectome::update_control (AdjustButton* const button, const float min, const float mean, const float max)
+        {
+          button->setRate (0.001f * (max - min));
+          button->setMin (min);
+          button->setMax (max);
+          button->setValue (mean);
+        }
+
+        void Connectome::update_controls (AdjustButton* const lower_button, AdjustButton* const upper_button, const float min, const float mean, const float max)
+        {
+          lower_button->setValue (min);
+          upper_button->setValue (max);
+          lower_button->setMax (max);
+          upper_button->setMin (min);
+          lower_button->setRate (0.01f * (mean - min));
+          upper_button->setRate (0.01f * (max - mean));
         }
 
 
@@ -3837,7 +3783,7 @@ namespace MR
           // Request exemplar track file path from user
           const std::string path = GUI::Dialog::File::get_file (this, "Select file containing mesh for each node", "OBJ mesh files (*.obj)");
           if (!path.size()) return;
-          Mesh::MeshMulti meshes;
+          Surface::MeshMulti meshes;
           meshes.load (path);
           if (meshes.size() != nodes.size())
             throw Exception ("Mesh file contains " + str(meshes.size()) + " objects; expected " + str(nodes.size()));
