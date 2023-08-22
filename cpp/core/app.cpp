@@ -1026,7 +1026,7 @@ std::string restructured_text_usage() {
           s += md_indent + "\"output_file_template\": \"" + format_output_template(ARGUMENTS[i].id, ARGUMENTS[i].type) + "\",\n";
           output_type = true;
         }
-        s += md_indent + "\"help_string\": \"" + ARGUMENTS[i].desc + "\",\n";
+        s += md_indent + "\"help_string\": \"\"\"" + ARGUMENTS[i].desc + "\"\"\",\n";
         if (!(ARGUMENTS[i].flags & Optional) && !output_type) {
           s += md_indent + "\"mandatory\": True,\n";
         }
@@ -1079,7 +1079,7 @@ std::string restructured_text_usage() {
             // Print type
             s += indent + format_type(ARGUMENTS[i].type, true) + ",\n";
             s += indent + "{\n";
-            s += md_indent + "\"help_string\": \"" + ARGUMENTS[i].desc + "\",\n";
+            s += md_indent + "\"help_string\": \"\"\"" + ARGUMENTS[i].desc + "\"\"\",\n";
             s += indent + "},\n" + base_indent + "),\n";
         }
       }
@@ -1109,7 +1109,7 @@ std::string restructured_text_usage() {
                 // Print type
                 s += indent + format_option_type(OPTIONS[n][o], true) + ",\n";
                 s += indent + "{\n";
-                s += md_indent + "\"help_string\": \"" + OPTIONS[n][o].desc + "\",\n";
+                s += md_indent + "\"help_string\": \"\"\"" + OPTIONS[n][o].desc + "\"\"\",\n";
                 s += indent + "},\n" + base_indent + "),\n";
               }
             }
