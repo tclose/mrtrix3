@@ -47,3 +47,6 @@ CMakeLists.txt.user
 _version.py
 version.cpp
 exec_version.cpp
+__pycache__
+.DS_Store
+/pydra/pydra/tasks/mrtrix3/_version.py
