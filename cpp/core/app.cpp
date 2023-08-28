@@ -1337,7 +1337,6 @@ void parse_special_options() {
   }
 }
 
-
 void parse() {
   argument.clear();
   option.clear();
