@@ -1461,10 +1461,49 @@ class Parser(argparse.ArgumentParser):
         metadata["mandatory"] = True
       return metadata
 
-    def parse_type(type_):
-      if type_:
-        return f"#{type_.__name__}#"
-      return ty.Any
+    def parse_type(type_, for_output: bool = False):
+      if type_ is str:
+        type_str = "str"
+      elif isinstance(type_, Parser.Various):
+        type_str = "ty.Any"
+      elif isinstance(type_, Parser.Bool):
+        type_str = "bool"
+      elif type(type_).__name__ == "IntBounded":
+        type_str = "int"
+      elif type(type_).__name__ == "FloatBounded":
+        type_str = "float"
+      elif isinstance(type_, Parser.FileIn):
+        type_str = "File"
+      elif isinstance(type_, Parser.FileOut):
+        if (for_output):
+          type_str = "File"
+        else:
+          type_str = "Path"
+      elif isinstance(type_, Parser.DirectoryIn):
+        type_str = "Directory"
+      elif isinstance(type_, Parser.DirectoryOut):
+        if (for_output):
+          type_str = "Directory"
+        else:
+          type_str = "Path"
+      elif isinstance(type_, Parser.ImageIn):
+        type_str = "ImageIn"
+      elif isinstance(type_, Parser.ImageOut):
+        if (for_output):
+          type_str = "ImageOut"
+        else:
+          type_str = "Path"
+      elif isinstance(type_, Parser.SequenceInt):
+        type_str = "ty.List[int]"
+      elif isinstance(type_, Parser.SequenceFloat):
+        type_str = "ty.List[float]"
+      elif isinstance(type_, Parser.TracksIn):
+        type_str = "Tracks"
+      elif isinstance(type_, Parser.TracksOut):
+        type_str = "Tracks"
+      else:
+        raise ValueError("Unrecognized type: " + str(type_))
+      return f"#{type_str}#"
 
     def escape_id(id_: str) -> str:
       if id_ == "input":
@@ -1514,7 +1553,7 @@ class Parser(argparse.ArgumentParser):
         else:
           type_ = parse_type(option.type)
         if isinstance(option, argparse._AppendAction):
-          type_ = f"#specs.MultiInputObj[{type_}]#"
+          type_ = f"#specs.MultiInputObj[{type_.replace('#', '')}]#"
         metadata = get_arg_metadata(option)
         metadata["argstr"] = "-" + option.dest
         inputs.append(
