@@ -1462,7 +1462,7 @@ class Parser(argparse.ArgumentParser):
       return metadata
 
     def parse_type(type_, for_output: bool = False):
-      if type_ is str:
+      if type_ is str or type_ is None:
         type_str = "str"
       elif isinstance(type_, Parser.Various):
         type_str = "ty.Any"
@@ -1517,26 +1517,40 @@ class Parser(argparse.ArgumentParser):
       escaped = escaped.replace(".", '_')
       return escaped
 
+    def mutually_exclusive(option_name):
+      for group in self._mutually_exclusive_option_groups:
+        if option_name in group[0]:
+          return tuple(group[0])
+      return None
+
     inputs = []
+    outputs = []
     input_names = [a.dest for a in self._positionals._group_actions]
-    output_names = []
     for pos, arg in enumerate(self._positionals._group_actions):
       metadata = get_arg_metadata(arg)
       metadata["position"] = pos
       metadata["argstr"] = ""
       arg_id = escape_id(arg.dest)
-      if arg.type:
-        type_ = parse_type(arg.type)
-      elif arg_id == "input":
-        type_ = "#FsObject#"
-      elif arg_id == "output":
-        type_ = "#Path#"
-        output_names.append(arg_id)
-      else:
-        type_ = ty.Any
-      if arg_id == "output" and "input" in input_names:
-        metadata["output_file_template"] = "output_{input}"
+      type_ = parse_type(arg.type)
+      if isinstance(arg.type, (Parser.FileOut, Parser.DirectoryOut, Parser.ImageOut)):
+        if isinstance(arg.type, Parser.ImageOut):
+          ext = ".mif"
+        elif isinstance(arg.type, Parser.FileOut):
+          ext = ".txt"
+        else:
+          ext = ""
+        metadata["output_file_template"] = arg_id + ext
         metadata.pop("mandatory", None)
+        outputs.append((
+            (
+              arg_id,
+              parse_type(arg.type, for_output=True),
+              {
+                "help_string": arg.help,
+              },
+            )
+          )
+        )
       inputs.append(
         (
           arg_id,
@@ -1549,13 +1563,28 @@ class Parser(argparse.ArgumentParser):
         if option.dest in input_names:
           continue
         if isinstance(option, argparse._StoreTrueAction):
+          assert option.type is None
           type_ = "#bool#"
         else:
           type_ = parse_type(option.type)
+          if isinstance(option.type, (Parser.FileOut, Parser.DirectoryOut, Parser.ImageOut)):
+            outputs.append((
+                (
+                  option.dest,
+                  parse_type(option.type, for_output=True),
+                  {
+                    "help_string": option.help,
+                  },
+                )
+              )
+            )
         if isinstance(option, argparse._AppendAction):
           type_ = f"#specs.MultiInputObj[{type_.replace('#', '')}]#"
         metadata = get_arg_metadata(option)
         metadata["argstr"] = "-" + option.dest
+        xor = mutually_exclusive(option.dest)
+        if xor:
+          metadata["xor"] = xor
         inputs.append(
           (
             escape_id(option.dest),
@@ -1565,24 +1594,6 @@ class Parser(argparse.ArgumentParser):
         )
     # Replace # escapes
     inputs_str = re.sub(r"'#([a-zA-Z0-9\._\[\]]+)#'", r"\1", str(inputs))
-
-    outputs = []
-    for arg in self._positionals._group_actions:
-      arg_id = escape_id(arg.dest)
-      if arg_id in output_names:
-        metadata = get_arg_metadata(arg)
-        if arg.type:
-          type_ = arg.type
-        else:
-          type_ = "#FsObject#"
-        outputs.append((
-            (
-              arg_id,
-              type_,
-              metadata,
-            )
-          )
-        )
     outputs_str = re.sub(r"'#([a-zA-Z0-9_\[\]]+)#'", r"\1", str(outputs))
 
     def cmd_to_task_name(cmd_name: str) -> str:
