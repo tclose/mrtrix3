@@ -1239,7 +1239,7 @@ std::string pydra_usage() {
   s += "\n" + base_indent + "MRtrix\n" + base_indent + "------" + "\n\n" + indent + "Version:" + mrtrix_version +
        ", built " + build_date + "\n\n" + indent + "Author: " + AUTHOR + "\n\n" + indent + "Copyright: " + COPYRIGHT;
   s += "    \"\"\"\n";
-  s += "    executable = \"" + name_string + "\"\n";
+  s += "    executable = \"" + NAME + "\"\n";
   s += "    input_spec = " + name_string + "InputSpec\n";
   s += "    output_spec = " + name_string + "OutputSpec\n\n";
 
