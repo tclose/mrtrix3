@@ -1465,7 +1465,7 @@ class Parser(argparse.ArgumentParser):
       if type_ is str or type_ is None:
         type_str = "str"
       elif isinstance(type_, Parser.Various):
-        type_str = "ty.Any"
+        type_str = "typing.Any"
       elif isinstance(type_, Parser.Bool):
         type_str = "bool"
       elif type(type_).__name__ == "IntBounded":
@@ -1494,9 +1494,9 @@ class Parser(argparse.ArgumentParser):
         else:
           type_str = "Path"
       elif isinstance(type_, Parser.SequenceInt):
-        type_str = "ty.List[int]"
+        type_str = "typing.List[int]"
       elif isinstance(type_, Parser.SequenceFloat):
-        type_str = "ty.List[float]"
+        type_str = "typing.List[float]"
       elif isinstance(type_, Parser.TracksIn):
         type_str = "Tracks"
       elif isinstance(type_, Parser.TracksOut):
