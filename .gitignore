@@ -52,6 +52,9 @@ version.cpp
 exec_version.cpp
 __pycache__
 .DS_Store
+
+# Pydra related ignores
+
 _version.py
 /interfaces/pydra/src/pydra/tasks/mrtrix3/v3_0
 /interfaces/pydra/**/dist/**
