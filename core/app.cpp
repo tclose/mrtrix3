@@ -866,7 +866,7 @@ std::string pydra_usage() {
     return escaped;
   };
 
-  auto format_type = [&](const ArgType &type, bool for_output = false) {
+  auto format_type = [&](const ArgType &type, bool for_output = false, bool optional = false) {
     switch (type) {
     case Undefined:
       return "ty.Any";
@@ -883,6 +883,8 @@ std::string pydra_usage() {
     case ArgFileOut:
       if (for_output)
         return "File";
+      else if (optional)
+        return "ty.Union[Path, bool]";
       else
         return "Path";
     case ArgDirectoryIn:
@@ -890,6 +892,8 @@ std::string pydra_usage() {
     case ArgDirectoryOut:
       if (for_output)
         return "Directory";
+      else if (optional)
+        return "ty.Union[Path, bool]";
       else
         return "Path";
     case Choice:
@@ -899,6 +903,8 @@ std::string pydra_usage() {
     case ImageOut:
       if (for_output)
         return "ImageOut";
+      else if (optional)
+        return "ty.Union[Path, bool]";
       else
         return "Path";
     case IntSeq:
@@ -926,11 +932,11 @@ std::string pydra_usage() {
     if (!opt.size()) {
       f += "bool";
     } else if (opt.size() == 1) {
-      f += format_type(opt[0].type, for_output);
+      f += format_type(opt[0].type, for_output, true);
     } else {
       f += "ty.Tuple[";
       for (size_t a = 0; a < opt.size(); ++a) {
-        f += format_type(opt[0].type, for_output);
+        f += format_type(opt[0].type, for_output, true);
         if (a != opt.size() - 1) {
           f += ", ";
         }
@@ -999,6 +1005,7 @@ std::string pydra_usage() {
     f += md_indent + "\"argstr\": \"-" + opt.id + "\",\n";
     if (is_output_file) {
       f += md_indent + "\"output_file_template\": " + format_output_templates(escape_id(opt.id), opt) + ",\n";
+      f += md_indent + "\"default\": False,\n";
     }
     f += md_indent + "\"help_string\": \"\"\"" + opt.desc + "\"\"\",\n";
     if (!(opt.flags & Optional) && !is_output_file) {

@@ -1461,7 +1461,7 @@ class Parser(argparse.ArgumentParser):
         metadata["mandatory"] = True
       return metadata
 
-    def parse_type(type_, for_output: bool = False):
+    def parse_type(type_, for_output: bool = False, optional: bool = False):
       if type_ is str or type_ is None:
         type_str = "str"
       elif isinstance(type_, Parser.Various):
@@ -1477,13 +1477,17 @@ class Parser(argparse.ArgumentParser):
       elif isinstance(type_, Parser.FileOut):
         if (for_output):
           type_str = "File"
+        elif optional:
+          type_str = "typing.Union[Path, bool]"
         else:
           type_str = "Path"
       elif isinstance(type_, Parser.DirectoryIn):
         type_str = "Directory"
       elif isinstance(type_, Parser.DirectoryOut):
-        if (for_output):
+        if for_output:
           type_str = "Directory"
+        elif optional:
+          type_str = "typing.Union[Path, bool]"
         else:
           type_str = "Path"
       elif isinstance(type_, Parser.ImageIn):
@@ -1491,6 +1495,8 @@ class Parser(argparse.ArgumentParser):
       elif isinstance(type_, Parser.ImageOut):
         if (for_output):
           type_str = "ImageOut"
+        elif optional:
+          type_str = "typing.Union[Path, bool]"
         else:
           type_str = "Path"
       elif isinstance(type_, Parser.SequenceInt):
@@ -1562,16 +1568,18 @@ class Parser(argparse.ArgumentParser):
       for option in group._group_actions:
         if option.dest in input_names:
           continue
+        output_type = None
         if isinstance(option, argparse._StoreTrueAction):
           assert option.type is None
           type_ = "#bool#"
         else:
-          type_ = parse_type(option.type)
+          type_ = parse_type(option.type, optional=True)
           if isinstance(option.type, (Parser.FileOut, Parser.DirectoryOut, Parser.ImageOut)):
+            output_type = parse_type(option.type, for_output=True)
             outputs.append((
                 (
                   option.dest,
-                  parse_type(option.type, for_output=True),
+                  output_type,
                   {
                     "help_string": option.help,
                   },
@@ -1585,6 +1593,15 @@ class Parser(argparse.ArgumentParser):
         xor = mutually_exclusive(option.dest)
         if xor:
           metadata["xor"] = xor
+        if output_type:
+          if isinstance(option.type, Parser.ImageOut):
+            ext = ".mif"
+          elif isinstance(option.type, Parser.FileOut):
+            ext = ".txt"
+          else:
+            ext = ""
+          metadata["output_file_template"] = escape_id(option.dest) + ext
+          metadata["default"] = False
         inputs.append(
           (
             escape_id(option.dest),
@@ -1593,8 +1610,8 @@ class Parser(argparse.ArgumentParser):
           )
         )
     # Replace # escapes
-    inputs_str = re.sub(r"'#([a-zA-Z0-9\._\[\]]+)#'", r"\1", str(inputs))
-    outputs_str = re.sub(r"'#([a-zA-Z0-9_\[\]]+)#'", r"\1", str(outputs))
+    inputs_str = re.sub(r"'#([^#]+)#'", r"\1", str(inputs))
+    outputs_str = re.sub(r"'#([^#]+)#'", r"\1", str(outputs))
 
     def cmd_to_task_name(cmd_name: str) -> str:
       """Get Task class name from cmd name"""
