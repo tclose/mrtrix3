@@ -939,8 +939,8 @@ std::string pydra_usage() {
     case ArgFileOut:
       if (for_output)
         return "File";
-      else if (optional)
-        return "ty.Union[Path, bool]";
+      // else if (optional)
+      //   return "ty.Union[Path, bool]";
       else
         return "Path";
     case ArgDirectoryIn:
@@ -948,8 +948,8 @@ std::string pydra_usage() {
     case ArgDirectoryOut:
       if (for_output)
         return "Directory";
-      else if (optional)
-        return "ty.Union[Path, bool]";
+      // else if (optional)
+      //   return "ty.Union[Path, bool]";
       else
         return "Path";
     case Choice:
@@ -959,8 +959,8 @@ std::string pydra_usage() {
     case ImageOut:
       if (for_output)
         return "ImageOut";
-      else if (optional)
-        return "ty.Union[Path, bool]";
+      // else if (optional)
+      //   return "ty.Union[Path, bool]";
       else
         return "Path";
     case IntSeq:
