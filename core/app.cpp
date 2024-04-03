@@ -1005,7 +1005,6 @@ std::string pydra_usage() {
     f += md_indent + "\"argstr\": \"-" + opt.id + "\",\n";
     if (is_output_file) {
       f += md_indent + "\"output_file_template\": " + format_output_templates(escape_id(opt.id), opt) + ",\n";
-      f += md_indent + "\"default\": False,\n";
     }
     f += md_indent + "\"help_string\": \"\"\"" + opt.desc + "\"\"\",\n";
     if (!(opt.flags & Optional) && !is_output_file) {
