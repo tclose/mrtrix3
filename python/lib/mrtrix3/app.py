@@ -1601,14 +1601,19 @@ class Parser(argparse.ArgumentParser):
           else:
             ext = ""
           metadata["output_file_template"] = escape_id(option.dest) + ext
-          metadata["default"] = False
-        inputs.append(
-          (
+          input_tple = (
+            escape_id(option.dest),
+            type_,
+            False,
+            metadata,
+          )
+        else:
+          input_tple = (
             escape_id(option.dest),
             type_,
             metadata,
           )
-        )
+        inputs.append(input_tple)
     # Replace # escapes
     inputs_str = re.sub(r"'#([^#]+)#'", r"\1", str(inputs))
     outputs_str = re.sub(r"'#([^#]+)#'", r"\1", str(outputs))
