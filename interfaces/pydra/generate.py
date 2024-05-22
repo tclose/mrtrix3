@@ -246,12 +246,12 @@ def auto_gen_test(cmd_name: str, output_dir: Path, log_errors: bool, pkg_version
 from fileformats.generic import File, Directory, FsObject  # noqa
 from fileformats.medimage import Nifti1  # noqa
 from fileformats.medimage_mrtrix3 import ImageFormat, ImageIn, Tracks  # noqa
-from pydra.tasks.mrtrix3.{pkg_version} import {cmd_name}
+from pydra.tasks.mrtrix3.{pkg_version} import {interface.__name__}
 
 
 def test_{cmd_name.lower()}(tmp_path, cli_parse_only):
 
-    task = {cmd_name}(
+    task = {interface.__name__}(
 """
     input_fields = attrs.fields(type(task.inputs))
     output_fields = attrs.fields(make_klass(task.output_spec))
