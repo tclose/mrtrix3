@@ -1452,16 +1452,14 @@ class Parser(argparse.ArgumentParser):
       return
 
     def get_arg_metadata(arg):
-      metadata = {
-        "help_string": arg.help,
+      kwds = {
+        "help": arg.help,
       }
       if arg.choices:
-        metadata["allowed_values"] = list(arg.choices)
-      if arg.required:
-        metadata["mandatory"] = True
-      return metadata
+        kwds["allowed_values"] = list(arg.choices)
+      return kwds
 
-    def parse_type(type_, for_output: bool = False, optional: bool = False):
+    def parse_type(type_, optional: bool = False):
       if type_ is str or type_ is None:
         type_str = "str"
       elif isinstance(type_, Parser.Various):
@@ -1475,30 +1473,15 @@ class Parser(argparse.ArgumentParser):
       elif isinstance(type_, Parser.FileIn):
         type_str = "File"
       elif isinstance(type_, Parser.FileOut):
-        if (for_output):
-          type_str = "File"
-        elif optional:
-          type_str = "typing.Union[Path, bool]"
-        else:
-          type_str = "Path"
+        type_str = "File"
       elif isinstance(type_, Parser.DirectoryIn):
         type_str = "Directory"
       elif isinstance(type_, Parser.DirectoryOut):
-        if for_output:
-          type_str = "Directory"
-        elif optional:
-          type_str = "typing.Union[Path, bool]"
-        else:
-          type_str = "Path"
+        type_str = "Directory"
       elif isinstance(type_, Parser.ImageIn):
         type_str = "ImageIn"
       elif isinstance(type_, Parser.ImageOut):
-        if (for_output):
-          type_str = "ImageOut"
-        elif optional:
-          type_str = "typing.Union[Path, bool]"
-        else:
-          type_str = "Path"
+        type_str = "ImageOut"
       elif isinstance(type_, Parser.SequenceInt):
         type_str = "typing.List[int]"
       elif isinstance(type_, Parser.SequenceFloat):
@@ -1509,7 +1492,9 @@ class Parser(argparse.ArgumentParser):
         type_str = "Tracks"
       else:
         raise ValueError("Unrecognized type: " + str(type_))
-      return f"#{type_str}#"
+      if optional:
+        type_str += " | None"
+      return type_str
 
     def escape_id(id_: str) -> str:
       if id_ == "input":
@@ -1533,9 +1518,13 @@ class Parser(argparse.ArgumentParser):
     outputs = []
     input_names = [a.dest for a in self._positionals._group_actions]
     for pos, arg in enumerate(self._positionals._group_actions):
-      metadata = get_arg_metadata(arg)
-      metadata["position"] = pos
-      metadata["argstr"] = ""
+      kwds = {
+        "position": pos,
+        "argstr": "",
+        "help": arg.help,
+      }
+      if arg.choices:
+        kwds["allowed_values"] = list(arg.choices)
       arg_id = escape_id(arg.dest)
       type_ = parse_type(arg.type)
       if isinstance(arg.type, (Parser.FileOut, Parser.DirectoryOut, Parser.ImageOut)):
@@ -1545,78 +1534,73 @@ class Parser(argparse.ArgumentParser):
           ext = ".txt"
         else:
           ext = ""
-        metadata["output_file_template"] = arg_id + ext
-        metadata.pop("mandatory", None)
-        outputs.append((
-            (
-              arg_id,
-              parse_type(arg.type, for_output=True),
-              {
-                "help_string": arg.help,
-              },
-            )
-          )
-        )
-      inputs.append(
+        kwds["path_template"] = arg_id + ext
+        is_output = True
+      else:
+        is_output = False
+      (outputs if is_output else inputs).append(
         (
           arg_id,
           type_,
-          metadata,
+          kwds,
         )
       )
     for group in reversed(self._action_groups):
       for option in group._group_actions:
+        is_output = isinstance(
+          option.type,
+          (Parser.FileOut, Parser.DirectoryOut, Parser.ImageOut)
+        )
         if option.dest in input_names:
           continue
-        output_type = None
         if isinstance(option, argparse._StoreTrueAction):
           assert option.type is None
-          type_ = "#bool#"
+          type_ = "bool"
         else:
           type_ = parse_type(option.type, optional=True)
-          if isinstance(option.type, (Parser.FileOut, Parser.DirectoryOut, Parser.ImageOut)):
-            output_type = parse_type(option.type, for_output=True)
-            outputs.append((
-                (
-                  option.dest,
-                  output_type,
-                  {
-                    "help_string": option.help,
-                  },
-                )
-              )
-            )
         if isinstance(option, argparse._AppendAction):
-          type_ = f"#specs.MultiInputObj[{type_.replace('#', '')}]#"
-        metadata = get_arg_metadata(option)
-        metadata["argstr"] = "-" + option.dest
+          if is_output:
+            type_ = "list"
+          else:
+            type_ = "MultiInputObj"
+          type_ += f"[{type_}]"
+        kwds = get_arg_metadata(option)
+        kwds["argstr"] = "-" + option.dest
         xor = mutually_exclusive(option.dest)
         if xor:
-          metadata["xor"] = xor
-        if output_type:
+          kwds["xor"] = xor
+        if type_ == "bool":
+          kwds["default"] = False
+        else:
+          kwds["default"] = None
+        if is_output:
           if isinstance(option.type, Parser.ImageOut):
             ext = ".mif"
           elif isinstance(option.type, Parser.FileOut):
             ext = ".txt"
           else:
             ext = ""
-          metadata["output_file_template"] = escape_id(option.dest) + ext
-          input_tple = (
+          kwds["path_template"] = escape_id(option.dest) + ext
+        (outputs if is_output else inputs).append(
+          (
             escape_id(option.dest),
             type_,
-            False,
-            metadata,
+            kwds,
           )
-        else:
-          input_tple = (
-            escape_id(option.dest),
-            type_,
-            metadata,
-          )
-        inputs.append(input_tple)
+        )
     # Replace # escapes
-    inputs_str = re.sub(r"'#([^#]+)#'", r"\1", str(inputs))
-    outputs_str = re.sub(r"'#([^#]+)#'", r"\1", str(outputs))
+    inputs_str = ""
+    outputs_str = ""
+    indent = "    "
+    md_indent = indent + "    "
+    for inpt_name, type_, kwds in inputs:
+      inputs_str += f"{indent}{inpt_name}: {type_} = shell.arg(\n{indent}    "
+      inputs_str += f"\n{md_indent}".join(f"{k}={v!r}," for k, v in kwds.items())
+      inputs_str += f"\n{indent})\n"
+    for outpt_name, type_, kwds in outputs:
+      outputs_str += f"{indent}    {outpt_name}: {type_} = shell.outarg(\n{indent}        "
+      outputs_str += f"\n{md_indent}    ".join(f"{k}={v!r}," for k, v in kwds.items())
+      outputs_str += f"\n{indent}    )\n"
 
     def cmd_to_task_name(cmd_name: str) -> str:
       """Get Task class name from cmd name"""
@@ -1645,18 +1629,15 @@ class Parser(argparse.ArgumentParser):
         "from pathlib import Path  # noqa: F401\n"
         "from fileformats.generic import FsObject, File, Directory  # noqa: F401\n"
         "from fileformats.medimage_mrtrix3 import Tracks, ImageIn, ImageOut  # noqa: F401\n"
-        "from pydra.engine.task import ShellCommandTask \n"
+        "from pydra.utils.typing import MultiInputObj\n"
+        "from pydra.design import shell\n"
         "from pydra.engine import specs\n"
     )
 
-    text += f"input_fields = {inputs_str}\n"
-    text += f"{task_name}InputSpec = specs.SpecInfo(name='{task_name}Input', fields=input_fields, bases=(specs.ShellSpec,))\n\n"
-    text += f"output_fields = {outputs_str}\n"
-    text += f"{task_name}OutputSpec = specs.SpecInfo(name='{task_name}Output', fields=output_fields, bases=(specs.ShellOutSpec,))\n\n"
-    text += f"class {task_name}(ShellCommandTask):\n"
+    text += f"\n\n@shell.define\nclass {task_name}(specs.ShellDef[\"{task_name}.Outputs\"]):\n"
     indent = "    "
     text += indent + "\"\"\"\n"
-    text += indent + (self.description if self.description else "")
+    text += indent + (self.description if self.description else "").replace("\n", "\n    ") + "\n"
     text += indent + "References\n"
     text += indent + "----------\n\n"
     for ref in self._citation_list:
@@ -1665,18 +1646,19 @@ class Parser(argparse.ArgumentParser):
         ref_text += ref[0] + ': '
       ref_text += ref[1]
       text += ref_text + '\n\n'
-    text += indent + _MRTRIX3_CORE_REFERENCE + '\n\n'
+    text += indent + _MRTRIX3_CORE_REFERENCE.replace("\n", "\n    ") + '\n\n'
     text += indent + '--------------\n\n\n\n'
     text += indent + '**Author:** ' + self._author + '\n\n'
-    text += indent + '**Copyright:** ' + self._copyright + '\n\n'
+    text += indent + '**Copyright:** ' + self._copyright.replace("\n", "\n    ") + '\n\n'
     text += indent + "\"\"\"\n"
-    text += f"    input_spec = {task_name}InputSpec\n"
-    text += f"    output_spec = {task_name}OutputSpec\n"
     if " " in self.prog:
       executable = tuple(self.prog.split(" "))
     else:
       executable = self.prog
     text += f"    executable={executable!r}\n\n"
+    text += inputs_str
+    text += f"\n\n{indent} class Outputs(specs.ShellOut):\n"
+    text += outputs_str
 
     if HAVE_BLACK:
       try:
@@ -1706,11 +1688,15 @@ class Parser(argparse.ArgumentParser):
     # * Don't display the subparser option; that's dealt with in the usage
     # * Don't re-display any compulsory positional arguments; they're also dealt with in the usage
     # * Don't display any ungrouped options; those are dealt with explicitly
-    return group._group_actions and \
-           not (len(group._group_actions) == 1 and \
-           isinstance(group._group_actions[0], argparse._SubParsersAction)) and \
-           not group == self._positionals and \
-           group.title not in ( 'options', 'optional arguments' )
+    return (
+      group._group_actions
+      and not (
+        len(group._group_actions) == 1
+        and isinstance(group._group_actions[0], argparse._SubParsersAction)
+      )
+      and not group == self._positionals
+      and group.title not in ( 'options', 'optional arguments' )
+    )
 
 
 
