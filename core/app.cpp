@@ -834,7 +834,6 @@ std::string pydra_usage() {
 
   std::string base_indent("    ");
   std::string indent = base_indent + "    ";
-  std::string md_indent = indent + "    ";
 
   std::string PYTHON_KEYWORDS[] = {
       "and",    "as",     "assert", "break",   "class",    "continue", "def",       "del",   "elif",
@@ -849,7 +848,9 @@ std::string pydra_usage() {
   s += "from pathlib import Path  # noqa: F401\n";
   s += "from fileformats.generic import File, Directory  # noqa: F401\n";
   s += "from fileformats.medimage_mrtrix3 import ImageIn, ImageOut, Tracks  # noqa: F401\n";
-  s += "from pydra.engine import specs, ShellCommandTask\n";
+  s += "from pydra.design import shell\n";
+  s += "from pydra.engine import specs\n";
+  s += "from pydra.utils.typing import MultiInputObj\n";
 
   auto escape_id = [&](const std::string &id) {
     std::string escaped = id;
@@ -866,7 +867,7 @@ std::string pydra_usage() {
     return escaped;
   };
 
-  auto format_type = [&](const ArgType &type, bool for_output = false, bool optional = false) {
+  auto format_type = [&](const ArgType &type, bool optional = false) {
     switch (type) {
     case Undefined:
       return "ty.Any";
@@ -881,36 +882,21 @@ std::string pydra_usage() {
     case ArgFileIn:
       return "File";
     case ArgFileOut:
-      if (for_output)
-        return "File";
-      // else if (optional)
-      //   return "ty.Union[Path, bool]";
-      else
-        return "Path";
+      return "File";
     case ArgDirectoryIn:
       return "Directory";
     case ArgDirectoryOut:
-      if (for_output)
-        return "Directory";
-      // else if (optional)
-      //   return "ty.Union[Path, bool]";
-      else
-        return "Path";
+      return "Directory";
     case Choice:
       return "str";
     case ImageIn:
       return "ImageIn";
     case ImageOut:
-      if (for_output)
-        return "ImageOut";
-      // else if (optional)
-      //   return "ty.Union[Path, bool]";
-      else
-        return "Path";
+      return "ImageOut";
     case IntSeq:
-      return "ty.List[int]";
+      return "list[int]";
     case FloatSeq:
-      return "ty.List[float]";
+      return "list[float]";
     case TracksIn:
       return "Tracks";
     case TracksOut:
@@ -927,16 +913,16 @@ std::string pydra_usage() {
     std::string f;
     bool is_multi = (opt.flags & AllowMultiple) && (!opt.size() || opt[0].type != ArgFileOut);
     if (is_multi) {
-      f += "specs.MultiInputObj[";
+      f += "MultiInputObj[";
     }
     if (!opt.size()) {
       f += "bool";
     } else if (opt.size() == 1) {
-      f += format_type(opt[0].type, for_output, true);
+      f += format_type(opt[0].type, true);
     } else {
-      f += "ty.Tuple[";
+      f += "tuple[";
       for (size_t a = 0; a < opt.size(); ++a) {
-        f += format_type(opt[0].type, for_output, true);
+        f += format_type(opt[0].type, true);
         if (a != opt.size() - 1) {
           f += ", ";
         }
@@ -950,7 +936,7 @@ std::string pydra_usage() {
   };
 
   auto format_choices = [&](const Argument &arg) {
-    std::string f = md_indent + "\"allowed_values\": [";
+    std::string f = indent + "\"allowed_values\": [";
     const char *const *choices = arg.limits.choices;
     f += std::string("\"") + choices[0] + "\"";
     for (int i = 0; choices[i]; ++i) {
@@ -984,42 +970,6 @@ std::string pydra_usage() {
     return tmpl;
   };
 
-  auto format_option = [&](const Option &opt) {
-    std::string f = base_indent + "(\n";
-    // Print name of field
-    f += indent + "\"" + escape_id(opt.id) + "\",\n";
-    bool is_output_file = false;
-    std::string type_string = format_option_type(opt);
-    bool is_multi = type_string.length() > 19 && type_string.substr(0, 19) == "specs.MultiInputObj";
-    if (opt.size() && (opt[0].type == ImageOut || opt[0].type == ArgFileOut || opt[0].type == ArgDirectoryOut)) {
-      is_output_file = true;
-      if (!is_multi)
-        type_string = "ty.Union[" + type_string + ", bool]";
-    }
-    // Print type
-    f += indent + type_string + ",\n";
-    if (is_output_file && !is_multi)
-      f += indent + "False,\n";
-    f += indent + "{\n";
-    // Print metadata fields
-    f += md_indent + "\"argstr\": \"-" + opt.id + "\",\n";
-    if (is_output_file) {
-      f += md_indent + "\"output_file_template\": " + format_output_templates(escape_id(opt.id), opt) + ",\n";
-    }
-    f += md_indent + "\"help_string\": \"\"\"" + opt.desc + "\"\"\",\n";
-    if (!(opt.flags & Optional) && !is_output_file) {
-      f += md_indent + "\"mandatory\": True,\n";
-    }
-    if (opt.size() == 1 && (opt[0].type == IntSeq || opt[0].type == FloatSeq)) {
-      f += md_indent + "\"sep\": \",\",\n";
-    }
-    if (opt.size() == 1 && opt[0].type == Choice) {
-      f += format_choices(opt[0]);
-    }
-    f += indent + "},\n" + base_indent + "),\n";
-    return f;
-  };
-
   auto format_arg_name = [&](const Argument &arg) {
     std::string id = arg.id;
     std::string arg_name;
@@ -1036,132 +986,106 @@ std::string pydra_usage() {
     return arg_name;
   };
 
-  // Print out input spec
-  s += "\n\ninput_fields = [\n\n" + base_indent + "# Arguments\n";
-  for (size_t i = 0; i < ARGUMENTS.size(); ++i) {
-
-    bool is_multi = (ARGUMENTS[i].flags & AllowMultiple) && (ARGUMENTS[i].type != ArgFileOut);
-    s += base_indent + "(\n";
+  auto format_argument = [&](const Argument &arg, int position, bool is_output = false) {
+    bool is_multi = (arg.flags & AllowMultiple) && (arg.type != ArgFileOut);
     // Print name of field
-    std::string arg_name = format_arg_name(ARGUMENTS[i]);
-    s += indent + "\"" + arg_name + "\",\n";
+    std::string f = "";
+    std::string arg_name = format_arg_name(arg);
+    f += base_indent + arg_name + ": ";
     // Print type
-    s += indent;
+    std::string type = "";
     if (is_multi) {
-      s += "specs.MultiInputObj[";
+      if (is_output)
+        type += "list[";
+      else
+        type += "MultiInputObj[";
     }
-    s += format_type(ARGUMENTS[i].type);
+    type += format_type(arg.type);
     if (is_multi) {
-      s += "]";
+      type += "]";
     }
-    s += +",\n" + indent + "{\n";
+    if (arg.flags & Optional) {
+      type += " | None";
+    }
+    f += type;
+    if (is_output)
+      f += " = shell.outarg(\n";
+    else
+      f += " = shell.arg(\n";
     // Print metadata fields
-    s += md_indent + "\"argstr\": \"\",\n";
-    s += md_indent + "\"position\": " + std::to_string(i) + ",\n";
-    bool output_type = false;
-    if (ARGUMENTS[i].type == ImageOut || ARGUMENTS[i].type == ArgFileOut || ARGUMENTS[i].type == ArgDirectoryOut) {
-      s += md_indent + "\"output_file_template\": \"" + format_output_template(arg_name, ARGUMENTS[i].type) + "\",\n";
-      output_type = true;
+    f += indent + "argstr=\"\",\n";
+    f += indent + "position=" + std::to_string(position) + ",\n";
+    if (arg.flags & Optional) {
+      if (arg.type == Boolean)
+        f += indent + "default=False,\n";
+      else
+        f += indent + "default=None,\n";
     }
-    s += md_indent + "\"help_string\": \"\"\"" + ARGUMENTS[i].desc + "\"\"\",\n";
-    if (!(ARGUMENTS[i].flags & Optional) && !output_type) {
-      s += md_indent + "\"mandatory\": True,\n";
+    if (is_output) {
+      f += indent + "path_template=\"" + format_output_template(arg_name, arg.type) + "\",\n";
     }
-    if (ARGUMENTS[i].type == Choice) {
-      s += format_choices(ARGUMENTS[i]);
+
+    f += indent + "help=\"\"\"" + arg.desc + "\"\"\",\n";
+
+    if (arg.type == Choice) {
+      f += format_choices(arg);
     }
-    s += indent + "},\n" + base_indent + "),\n";
-  }
+    f += base_indent + ")\n";
+    return f;
+  };
 
-  std::vector<std::string> group_names;
-  for (size_t i = 0; i < OPTIONS.size(); ++i) {
-    if (std::find(group_names.begin(), group_names.end(), OPTIONS[i].name) == group_names.end())
-      group_names.push_back(OPTIONS[i].name);
-  }
-  for (size_t i = 0; i < group_names.size(); ++i) {
-    size_t n = i;
-    while (OPTIONS[n].name != group_names[i])
-      ++n;
-    if (OPTIONS[n].name != std::string("OPTIONS"))
-      s += std::string("\n") + base_indent + "# " + OPTIONS[n].name + " Option Group\n";
-    while (n < OPTIONS.size()) {
-      if (OPTIONS[n].name == group_names[i]) {
-        for (size_t o = 0; o < OPTIONS[n].size(); ++o) {
-          s += format_option(OPTIONS[n][o]);
-        }
-      }
-      ++n;
+  auto format_option = [&](const Option &opt, bool is_output = false) {
+    // Print name of field
+    std::string f = base_indent + escape_id(opt.id) + ": ";
+    std::string type_string = format_option_type(opt);
+    bool is_multi = type_string.length() > 19 && type_string.substr(0, 19) == "MultiInputObj";
+    if (is_output && !is_multi) {
+      type_string += "| bool | None";
+    } else if (opt.flags & Optional) {
+      type_string += " | None";
     }
-  }
-
-  s += "\n" + base_indent + "# Standard options\n";
-  for (size_t i = 0; i < __standard_options.size(); ++i)
-    s += format_option(__standard_options[i]);
-
-  s += "]\n\n";
-
-  s += name_string + "InputSpec = specs.SpecInfo(name='" + name_string +
-       "Input', fields=input_fields, bases=(specs.ShellSpec,))\n\n\n";
-
-  s += "output_fields = [\n";
-
-  for (size_t i = 0; i < ARGUMENTS.size(); ++i) {
-    if (ARGUMENTS[i].type == ImageOut || ARGUMENTS[i].type == ArgFileOut || ARGUMENTS[i].type == ArgDirectoryOut) {
-      bool is_multi = ARGUMENTS[i].flags & AllowMultiple;
-      s += base_indent + "(\n";
-      // Print name of field
-      s += indent + "\"" + format_arg_name(ARGUMENTS[i]) + "\",\n";
-      // Print type
-      std::string type_string;
-      if (is_multi)
-        type_string += "ty.List[";
-      type_string += format_type(ARGUMENTS[i].type, true);
-      if (is_multi)
-        type_string += "]";
-      s += indent + type_string + ",\n";
-      s += indent + "{\n";
-      s += md_indent + "\"help_string\": \"\"\"" + ARGUMENTS[i].desc + "\"\"\",\n";
-      s += indent + "},\n" + base_indent + "),\n";
+    // Print type
+    f += type_string;
+    if (is_output)
+      f += " = shell.outarg(\n";
+    else
+      f += " = shell.arg(\n";
+    if (opt.flags & Optional) {
+      if (opt.type == Boolean)
+        f += indent + "default=False,\n";
+      else
+        f += indent + "default=None,\n";
     }
-  }
-
-  for (size_t i = 0; i < group_names.size(); ++i) {
-    size_t n = i;
-    while (OPTIONS[n].name != group_names[i])
-      ++n;
-    while (n < OPTIONS.size()) {
-      if (OPTIONS[n].name == group_names[i]) {
-        for (size_t o = 0; o < OPTIONS[n].size(); ++o) {
-          bool is_output_file = false;
-          for (size_t j = 0; j < OPTIONS[n][o].size(); ++j) {
-            if (OPTIONS[n][o][j].type == ImageOut || OPTIONS[n][o][j].type == ArgFileOut ||
-                OPTIONS[n][o][j].type == ArgDirectoryOut) {
-              is_output_file = true;
-              break;
-            }
-          }
-          if (is_output_file) {
-            s += base_indent + "(\n";
-            // Print name of field
-            s += indent + "\"" + OPTIONS[n][o].id + "\",\n";
-            // Print type
-            s += indent + format_option_type(OPTIONS[n][o], true) + ",\n";
-            s += indent + "{\n";
-            s += md_indent + "\"help_string\": \"\"\"" + OPTIONS[n][o].desc + "\"\"\",\n";
-            s += indent + "},\n" + base_indent + "),\n";
-          }
-        }
-      }
-      ++n;
+    // Print metadata fields
+    f += indent + "argstr= \"-" + opt.id + "\",\n";
+    if (is_output) {
+      f += indent + "path_template=" + format_output_templates(escape_id(opt.id), opt) + ",\n";
     }
-  }
+    f += indent + "help=\"\"\"" + opt.desc + "\"\"\",\n";
+    if (opt.size() == 1 && (opt[0].type == IntSeq || opt[0].type == FloatSeq)) {
+      f += indent + "sep=\",\",\n";
+    }
+    if (opt.size() == 1 && opt[0].type == Choice) {
+      f += format_choices(opt[0]);
+    }
+    f += base_indent + ")\n";
+    return f;
+  };
 
-  s += "]\n";
-  s += name_string + "OutputSpec = specs.SpecInfo(name='" + name_string +
-       "Output', fields=output_fields, bases=(specs.ShellOutSpec,))\n\n\n";
+  auto option_is_output = [&](const Option &opt) {
+    for (size_t i = 0; i < opt.size(); ++i) {
+      if (opt[i].type == ImageOut || opt[i].type == ArgFileOut || opt[i].type == ArgDirectoryOut)
+        return true;
+    }
+    return false;
+  };
+
+  auto argument_is_output = [&](const Argument &arg) {
+    return arg.type == ImageOut || arg.type == ArgFileOut || arg.type == ArgDirectoryOut;
+  };
 
   // Create actual class
-  s += "class " + name_string + "(ShellCommandTask):\n";
+  s += "\n\n@shell.define\nclass " + name_string + "(specs.ShellDef[\"" + name_string + ".Outputs\"]):\n";
   s += "    \"\"\"";
   // Add description
   if (DESCRIPTION.size()) {
@@ -1189,8 +1113,68 @@ std::string pydra_usage() {
        ", built " + build_date + "\n\n" + indent + "Author: " + AUTHOR + "\n\n" + indent + "Copyright: " + COPYRIGHT;
   s += "    \"\"\"\n";
   s += "    executable = \"" + NAME + "\"\n";
-  s += "    input_spec = " + name_string + "InputSpec\n";
-  s += "    output_spec = " + name_string + "OutputSpec\n\n";
+
+  s += base_indent + "# Arguments\n";
+
+  // Print out input spec
+  for (size_t i = 0; i < ARGUMENTS.size(); ++i) {
+    if (!argument_is_output(ARGUMENTS[i]))
+      s += format_argument(ARGUMENTS[i], i);
+  }
+
+  std::vector<std::string> group_names;
+  for (size_t i = 0; i < OPTIONS.size(); ++i) {
+    if (std::find(group_names.begin(), group_names.end(), OPTIONS[i].name) == group_names.end())
+      group_names.push_back(OPTIONS[i].name);
+  }
+  for (size_t i = 0; i < group_names.size(); ++i) {
+    size_t n = i;
+    while (OPTIONS[n].name != group_names[i])
+      ++n;
+    if (OPTIONS[n].name != std::string("OPTIONS"))
+      s += std::string("\n") + base_indent + "# " + OPTIONS[n].name + " Option Group\n";
+    while (n < OPTIONS.size()) {
+      if (OPTIONS[n].name == group_names[i]) {
+        for (size_t o = 0; o < OPTIONS[n].size(); ++o) {
+          if (!option_is_output(OPTIONS[n][o])) {
+            s += format_option(OPTIONS[n][o]);
+          }
+        }
+      }
+      ++n;
+    }
+  }
+
+  s += "\n" + base_indent + "# Standard options\n";
+  for (size_t i = 0; i < __standard_options.size(); ++i)
+    s += format_option(__standard_options[i]);
+
+  s += "\n" + base_indent + "class Outputs(spec.ShellOutputs):\n";
+
+  // Add an additional indent
+  base_indent += "    ";
+  indent += "    ";
+
+  for (size_t i = 0; i < ARGUMENTS.size(); ++i) {
+    if (argument_is_output(ARGUMENTS[i])) {
+      s += format_argument(ARGUMENTS[i], i, true);
+    }
+  }
+
+  for (size_t i = 0; i < group_names.size(); ++i) {
+    size_t n = i;
+    while (OPTIONS[n].name != group_names[i])
+      ++n;
+    while (n < OPTIONS.size()) {
+      if (OPTIONS[n].name == group_names[i]) {
+        for (size_t o = 0; o < OPTIONS[n].size(); ++o) {
+          if (option_is_output(OPTIONS[n][o]))
+            s += format_option(OPTIONS[n][o], true);
+        }
+      }
+      ++n;
+    }
+  }
 
   return s;
 }
