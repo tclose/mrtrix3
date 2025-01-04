@@ -1517,7 +1517,7 @@ class Parser(argparse.ArgumentParser):
     inputs = []
     outputs = []
     input_names = [a.dest for a in self._positionals._group_actions]
-    for pos, arg in enumerate(self._positionals._group_actions):
+    for pos, arg in enumerate(self._positionals._group_actions, start=1):
       kwds = {
         "position": pos,
         "argstr": "",
@@ -1657,8 +1657,9 @@ class Parser(argparse.ArgumentParser):
       executable = self.prog
     text += f"    executable={executable!r}\n\n"
     text += inputs_str
-    text += f"\n\n{indent} class Outputs(specs.ShellOut):\n"
-    text += outputs_str
+    if outputs_str:
+      text += f"\n\n{indent}class Outputs(specs.ShellOutputs):\n"
+      text += outputs_str
 
     if HAVE_BLACK:
       try:

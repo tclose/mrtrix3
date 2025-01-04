@@ -992,7 +992,7 @@ std::string pydra_usage() {
   };
 
   auto format_choices = [&](const Argument &arg) {
-    std::string f = indent + "\"allowed_values\": [";
+    std::string f = indent + "allowed_values=[";
     const char *const *choices = arg.limits.choices;
     f += std::string("\"") + choices[0] + "\"";
     for (int i = 0; choices[i]; ++i) {
@@ -1097,7 +1097,7 @@ std::string pydra_usage() {
     bool is_multi = type_string.length() > 19 && type_string.substr(0, 19) == "MultiInputObj";
     if (is_output && !is_multi) {
       type_string += "| bool | None";
-    } else if (opt.flags & Optional) {
+    } else if (opt.flags & Optional && type_string != "bool" && type_string != "ty.Any") {
       type_string += " | None";
     }
     // Print type
@@ -1107,7 +1107,7 @@ std::string pydra_usage() {
     else
       f += " = shell.arg(\n";
     if (opt.flags & Optional) {
-      if (opt.type == Boolean)
+      if (type_string == "bool")
         f += indent + "default=False,\n";
       else
         f += indent + "default=None,\n";
@@ -1153,9 +1153,9 @@ std::string pydra_usage() {
     s += "\n" + base_indent + "Example usages\n" + base_indent + "--------------\n\n";
     for (size_t i = 0; i < EXAMPLES.size(); ++i) {
       s += "\n" + base_indent + EXAMPLES[i].title + ":\n\n";
-      s += indent + "`$ " + EXAMPLES[i].code + "`\n\n";
+      s += base_indent + "`$ " + EXAMPLES[i].code + "`\n\n";
       if (EXAMPLES[i].description.size())
-        s += indent + EXAMPLES[i].description + "\n";
+        s += base_indent + EXAMPLES[i].description + "\n";
       s += "\n";
     }
   }
@@ -1165,18 +1165,21 @@ std::string pydra_usage() {
     s += indent + REFERENCES[i] + "\n\n";
   s += indent + MRTRIX_CORE_REFERENCE + "\n\n";
 
-  s += "\n" + base_indent + "MRtrix\n" + base_indent + "------" + "\n\n" + indent + "Version:" + mrtrix_version +
-       ", built " + build_date + "\n\n" + indent + "Author: " + AUTHOR + "\n\n" + indent + "Copyright: " + COPYRIGHT;
+  s += "\n" + base_indent + "MRtrix\n" + base_indent + "------" + "\n\n" + base_indent + "Version:" + mrtrix_version +
+       ", built " + build_date + "\n\n" + base_indent + "Author: " + AUTHOR + "\n\n" + base_indent +
+       "Copyright: " + COPYRIGHT;
   s += "    \"\"\"\n";
   s += "    executable = \"" + NAME + "\"\n";
 
-  s += base_indent + "# Arguments\n";
+  s += "\n" + base_indent + "# Arguments\n";
 
   // Print out input spec
   for (size_t i = 0; i < ARGUMENTS.size(); ++i) {
     if (!argument_is_output(ARGUMENTS[i]))
-      s += format_argument(ARGUMENTS[i], i);
+      s += format_argument(ARGUMENTS[i], i + 1);
   }
+
+  s += "\n" + base_indent + "# Options\n";
 
   std::vector<std::string> group_names;
   for (size_t i = 0; i < OPTIONS.size(); ++i) {
@@ -1188,7 +1191,7 @@ std::string pydra_usage() {
     while (OPTIONS[n].name != group_names[i])
       ++n;
     if (OPTIONS[n].name != std::string("OPTIONS"))
-      s += std::string("\n") + base_indent + "# " + OPTIONS[n].name + " Option Group\n";
+      s += std::string("\n") + base_indent + "# " + OPTIONS[n].name + ":\n";
     while (n < OPTIONS.size()) {
       if (OPTIONS[n].name == group_names[i]) {
         for (size_t o = 0; o < OPTIONS[n].size(); ++o) {
@@ -1203,17 +1206,20 @@ std::string pydra_usage() {
 
   s += "\n" + base_indent + "# Standard options\n";
   for (size_t i = 0; i < __standard_options.size(); ++i)
-    s += format_option(__standard_options[i]);
+    if (__standard_options[i].id != str("help") && __standard_options[i].id != str("version"))
+      s += format_option(__standard_options[i]);
 
-  s += "\n" + base_indent + "class Outputs(spec.ShellOutputs):\n";
+  s += "\n" + base_indent + "class Outputs(specs.ShellOutputs):\n";
 
   // Add an additional indent
   base_indent += "    ";
   indent += "    ";
 
+  int n_outputs = 0;
   for (size_t i = 0; i < ARGUMENTS.size(); ++i) {
     if (argument_is_output(ARGUMENTS[i])) {
-      s += format_argument(ARGUMENTS[i], i, true);
+      s += format_argument(ARGUMENTS[i], i + 1, true);
+      n_outputs++;
     }
   }
 
@@ -1224,13 +1230,18 @@ std::string pydra_usage() {
     while (n < OPTIONS.size()) {
       if (OPTIONS[n].name == group_names[i]) {
         for (size_t o = 0; o < OPTIONS[n].size(); ++o) {
-          if (option_is_output(OPTIONS[n][o]))
+          if (option_is_output(OPTIONS[n][o])) {
             s += format_option(OPTIONS[n][o], true);
+            n_outputs++;
+          }
         }
       }
       ++n;
     }
   }
+
+  if (n_outputs == 0)
+    s += base_indent + "pass\n";
 
   return s;
 }
