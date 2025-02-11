@@ -993,10 +993,10 @@ std::string pydra_usage() {
 
   auto format_choices = [&](const Argument &arg) {
     std::string f = indent + "allowed_values=[";
-    const char *const *choices = arg.limits.choices;
-    f += std::string("\"") + choices[0] + "\"";
-    for (int i = 0; choices[i]; ++i) {
-      f += std::string(", \"") + choices[i] + "\"";
+    std::vector<std::string> choices = std::get<std::vector<std::string>>(arg.limits);
+    f += "\"" + choices[0] + "\"";
+    for (int i = 1; i < choices.size(); ++i) {
+      f += ", \"" + choices[i] + "\"";
     }
     f += "],\n";
     return f;
@@ -1120,6 +1120,8 @@ std::string pydra_usage() {
     f += indent + "help=\"\"\"" + opt.desc + "\"\"\",\n";
     if (opt.size() == 1 && (opt[0].type == IntSeq || opt[0].type == FloatSeq)) {
       f += indent + "sep=\",\",\n";
+    } else if (opt.size() > 1) {
+      f += indent + "sep=\" \",\n";
     }
     if (opt.size() == 1 && opt[0].type == Choice) {
       f += format_choices(opt[0]);
