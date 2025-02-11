@@ -1064,6 +1064,8 @@ std::string pydra_usage() {
     f += indent + "help=\"\"\"" + opt.desc + "\"\"\",\n";
     if (opt.size() == 1 && (opt[0].type == IntSeq || opt[0].type == FloatSeq)) {
       f += indent + "sep=\",\",\n";
+    } else if (opt.size() > 1) {
+      f += indent + "sep=\" \",\n";
     }
     if (opt.size() == 1 && opt[0].type == Choice) {
       f += format_choices(opt[0]);
