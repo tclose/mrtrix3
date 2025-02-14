@@ -15,12 +15,12 @@ Usage
 
     dwi2mask algorithm [ options ] ...
 
--  *algorithm*: Select the algorithm to be used to complete the script operation; additional details and options become available once an algorithm is nominated. Options are: 3dautomask, ants, b02template, consensus, fslbet, hdbet, legacy, mean, mtnorm, synthstrip, trace
+-  *algorithm*: Select the algorithm to be used; additional details and options become available once an algorithm is nominated. Options are: 3dautomask, ants, b02template, consensus, fslbet, hdbet, legacy, mean, mtnorm, synthstrip, trace
 
 Description
 -----------
 
-This script serves as an interface for many different algorithms that generate a binary mask from DWI data in different ways. Each algorithm available has its own help page, including necessary references; e.g. to see the help page of the 'fslbet' algorithm, type 'dwi2mask fslbet'.
+This script serves as an interface for many different algorithms that generate a binary mask from DWI data in different ways. Each algorithm available has its own help page, including necessary references; e.g. to see the help page of the "fslbet" algorithm, type "dwi2mask fslbet".
 
 More information on mask derivation from DWI data can be found at the following link: 
 https://mrtrix.readthedocs.io/en/3.0.4/dwi_preprocessing/masking.html
@@ -40,7 +40,7 @@ Additional standard options for Python scripts
 
 - **-nocleanup** do not delete intermediate files during script execution, and do not delete scratch directory at script completion.
 
-- **-scratch /path/to/scratch/** manually specify the path in which to generate the scratch directory.
+- **-scratch /path/to/scratch/** manually specify an existing directory in which to generate the scratch directory.
 
 - **-continue ScratchDir LastFile** continue the script from a previous execution; must provide the scratch directory path, and the name of the last successfully-generated file.
 
@@ -112,24 +112,24 @@ Usage
 Options
 -------
 
-Options specific to the 'afni_3dautomask' algorithm
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Options specific to the "3dautomask" algorithm
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-- **-clfrac** Set the 'clip level fraction', must be a number between 0.1 and 0.9. A small value means to make the initial threshold for clipping smaller, which will tend to make the mask larger.
+- **-clfrac value** Set the "clip level fraction"; must be a number between 0.1 and 0.9. A small value means to make the initial threshold for clipping smaller, which will tend to make the mask larger.
 
-- **-nograd** The program uses a 'gradual' clip level by default. Add this option to use a fixed clip level.
+- **-nograd** The program uses a "gradual" clip level by default. Add this option to use a fixed clip level.
 
-- **-peels** Peel (erode) the mask n times, then unpeel (dilate).
+- **-peels iterations** Peel (erode) the mask n times, then unpeel (dilate).
 
-- **-nbhrs** Define the number of neighbors needed for a voxel NOT to be eroded.  It should be between 6 and 26.
+- **-nbhrs count** Define the number of neighbors needed for a voxel NOT to be eroded. It should be between 6 and 26.
 
 - **-eclip** After creating the mask, remove exterior voxels below the clip threshold.
 
-- **-SI** After creating the mask, find the most superior voxel, then zero out everything more than SI millimeters inferior to that. 130 seems to be decent (i.e., for Homo Sapiens brains).
+- **-SI value** After creating the mask, find the most superior voxel, then zero out everything more than SI millimeters inferior to that. 130 seems to be decent (i.e., for Homo Sapiens brains).
 
-- **-dilate** Dilate the mask outwards n times
+- **-dilate iterations** Dilate the mask outwards n times
 
-- **-erode** Erode the mask outwards n times
+- **-erode iterations** Erode the mask outwards n times
 
 - **-NN1** Erode and dilate based on mask faces
 
@@ -149,7 +149,7 @@ Additional standard options for Python scripts
 
 - **-nocleanup** do not delete intermediate files during script execution, and do not delete scratch directory at script completion.
 
-- **-scratch /path/to/scratch/** manually specify the path in which to generate the scratch directory.
+- **-scratch /path/to/scratch/** manually specify an existing directory in which to generate the scratch directory.
 
 - **-continue ScratchDir LastFile** continue the script from a previous execution; must provide the scratch directory path, and the name of the last successfully-generated file.
 
@@ -240,7 +240,7 @@ Additional standard options for Python scripts
 
 - **-nocleanup** do not delete intermediate files during script execution, and do not delete scratch directory at script completion.
 
-- **-scratch /path/to/scratch/** manually specify the path in which to generate the scratch directory.
+- **-scratch /path/to/scratch/** manually specify an existing directory in which to generate the scratch directory.
 
 - **-continue ScratchDir LastFile** continue the script from a previous execution; must provide the scratch directory path, and the name of the last successfully-generated file.
 
@@ -336,7 +336,7 @@ Options applicable when using the ANTs software for registration
 Options specific to the "template" algorithm
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-- **-software** The software to use for template registration; options are: antsfull,antsquick,fsl; default is antsquick
+- **-software choice** The software to use for template registration; options are: antsfull,antsquick,fsl; default is antsquick
 
 - **-template TemplateImage MaskImage** Provide the template image to which the input data will be registered, and the mask to be projected to the input image. The template image should be T2-weighted.
 
@@ -352,7 +352,7 @@ Additional standard options for Python scripts
 
 - **-nocleanup** do not delete intermediate files during script execution, and do not delete scratch directory at script completion.
 
-- **-scratch /path/to/scratch/** manually specify the path in which to generate the scratch directory.
+- **-scratch /path/to/scratch/** manually specify an existing directory in which to generate the scratch directory.
 
 - **-continue ScratchDir LastFile** continue the script from a previous execution; must provide the scratch directory path, and the name of the last successfully-generated file.
 
@@ -431,13 +431,13 @@ Options
 Options specific to the "consensus" algorithm
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-- **-algorithms** Provide a (space- or comma-separated) list of dwi2mask algorithms that are to be utilised
+- **-algorithms str <space-separated list of additional strs>** Provide a (space- or comma-separated) list of dwi2mask algorithms that are to be utilised
 
 - **-masks image** Export a 4D image containing the individual algorithm masks
 
 - **-template TemplateImage MaskImage** Provide a template image and corresponding mask for those algorithms requiring such
 
-- **-threshold** The fraction of algorithms that must include a voxel for that voxel to be present in the final mask (default: 0.501)
+- **-threshold value** The fraction of algorithms that must include a voxel for that voxel to be present in the final mask (default: 0.501)
 
 Options for importing the diffusion gradient table
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -451,7 +451,7 @@ Additional standard options for Python scripts
 
 - **-nocleanup** do not delete intermediate files during script execution, and do not delete scratch directory at script completion.
 
-- **-scratch /path/to/scratch/** manually specify the path in which to generate the scratch directory.
+- **-scratch /path/to/scratch/** manually specify an existing directory in which to generate the scratch directory.
 
 - **-continue ScratchDir LastFile** continue the script from a previous execution; must provide the scratch directory path, and the name of the last successfully-generated file.
 
@@ -523,16 +523,16 @@ Usage
 Options
 -------
 
-Options specific to the 'fslbet' algorithm
+Options specific to the "fslbet" algorithm
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-- **-bet_f** Fractional intensity threshold (0->1); smaller values give larger brain outline estimates
+- **-bet_f value** Fractional intensity threshold (0->1); smaller values give larger brain outline estimates
 
-- **-bet_g** Vertical gradient in fractional intensity threshold (-1->1); positive values give larger brain outline at bottom, smaller at top
+- **-bet_g value** Vertical gradient in fractional intensity threshold (-1->1); positive values give larger brain outline at bottom, smaller at top
 
 - **-bet_c i,j,k** Centre-of-gravity (voxels not mm) of initial mesh surface
 
-- **-bet_r** Head radius (mm not voxels); initial surface sphere is set to half of this
+- **-bet_r value** Head radius (mm not voxels); initial surface sphere is set to half of this
 
 - **-rescale** Rescale voxel size provided to BET to 1mm isotropic; can improve results for rodent data
 
@@ -548,7 +548,7 @@ Additional standard options for Python scripts
 
 - **-nocleanup** do not delete intermediate files during script execution, and do not delete scratch directory at script completion.
 
-- **-scratch /path/to/scratch/** manually specify the path in which to generate the scratch directory.
+- **-scratch /path/to/scratch/** manually specify an existing directory in which to generate the scratch directory.
 
 - **-continue ScratchDir LastFile** continue the script from a previous execution; must provide the scratch directory path, and the name of the last successfully-generated file.
 
@@ -622,7 +622,7 @@ Usage
 Options
 -------
 
-Options specific to the 'hdbet' algorithm
+Options specific to the "hdbet" algorithm
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 - **-nogpu** Do not attempt to run on the GPU
@@ -639,7 +639,7 @@ Additional standard options for Python scripts
 
 - **-nocleanup** do not delete intermediate files during script execution, and do not delete scratch directory at script completion.
 
-- **-scratch /path/to/scratch/** manually specify the path in which to generate the scratch directory.
+- **-scratch /path/to/scratch/** manually specify an existing directory in which to generate the scratch directory.
 
 - **-continue ScratchDir LastFile** continue the script from a previous execution; must provide the scratch directory path, and the name of the last successfully-generated file.
 
@@ -713,7 +713,7 @@ Usage
 Options
 -------
 
-- **-clean_scale** the maximum scale used to cut bridges. A certain maximum scale cuts bridges up to a width (in voxels) of 2x the provided scale. Setting this to 0 disables the mask cleaning step. (Default: 2)
+- **-clean_scale value** the maximum scale used to cut bridges. A certain maximum scale cuts bridges up to a width (in voxels) of 2x the provided scale. Setting this to 0 disables the mask cleaning step. (Default: 2)
 
 Options for importing the diffusion gradient table
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -727,7 +727,7 @@ Additional standard options for Python scripts
 
 - **-nocleanup** do not delete intermediate files during script execution, and do not delete scratch directory at script completion.
 
-- **-scratch /path/to/scratch/** manually specify the path in which to generate the scratch directory.
+- **-scratch /path/to/scratch/** manually specify an existing directory in which to generate the scratch directory.
 
 - **-continue ScratchDir LastFile** continue the script from a previous execution; must provide the scratch directory path, and the name of the last successfully-generated file.
 
@@ -799,12 +799,12 @@ Usage
 Options
 -------
 
-Options specific to the 'mean' algorithm
+Options specific to the "mean" algorithm
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 - **-shells bvalues** Comma separated list of shells to be included in the volume averaging
 
-- **-clean_scale** the maximum scale used to cut bridges. A certain maximum scale cuts bridges up to a width (in voxels) of 2x the provided scale. Setting this to 0 disables the mask cleaning step. (Default: 2)
+- **-clean_scale value** the maximum scale used to cut bridges. A certain maximum scale cuts bridges up to a width (in voxels) of 2x the provided scale. Setting this to 0 disables the mask cleaning step. (Default: 2)
 
 Options for importing the diffusion gradient table
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -818,7 +818,7 @@ Additional standard options for Python scripts
 
 - **-nocleanup** do not delete intermediate files during script execution, and do not delete scratch directory at script completion.
 
-- **-scratch /path/to/scratch/** manually specify the path in which to generate the scratch directory.
+- **-scratch /path/to/scratch/** manually specify an existing directory in which to generate the scratch directory.
 
 - **-continue ScratchDir LastFile** continue the script from a previous execution; must provide the scratch directory path, and the name of the last successfully-generated file.
 
@@ -904,7 +904,7 @@ Options specific to the "mtnorm" algorithm
 
 - **-init_mask image** Provide an initial brain mask, which will constrain the response function estimation (if omitted, the default dwi2mask algorithm will be used)
 
-- **-lmax values** The maximum spherical harmonic degree for the estimated FODs (see Description); defaults are "4,0,0" for multi-shell and "4,0" for single-shell data)
+- **-lmax values** The maximum spherical harmonic degree for the estimated FODs (see Description); defaults are "4,0,0" for multi-shell and "4,0" for single-shell data
 
 - **-threshold value** the threshold on the total tissue density sum image used to derive the brain mask; default is 0.5
 
@@ -922,7 +922,7 @@ Additional standard options for Python scripts
 
 - **-nocleanup** do not delete intermediate files during script execution, and do not delete scratch directory at script completion.
 
-- **-scratch /path/to/scratch/** manually specify the path in which to generate the scratch directory.
+- **-scratch /path/to/scratch/** manually specify an existing directory in which to generate the scratch directory.
 
 - **-continue ScratchDir LastFile** continue the script from a previous execution; must provide the scratch directory path, and the name of the last successfully-generated file.
 
@@ -1006,7 +1006,7 @@ Options
 Options specific to the 'Synthstrip' algorithm
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-- **-stripped** The output stripped image
+- **-stripped image** The output stripped image
 
 - **-gpu** Use the GPU
 
@@ -1014,7 +1014,7 @@ Options specific to the 'Synthstrip' algorithm
 
 - **-nocsf** Compute the immediate boundary of brain matter excluding surrounding CSF
 
-- **-border** Control the boundary distance from the brain
+- **-border value** Control the boundary distance from the brain
 
 Options for importing the diffusion gradient table
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1028,7 +1028,7 @@ Additional standard options for Python scripts
 
 - **-nocleanup** do not delete intermediate files during script execution, and do not delete scratch directory at script completion.
 
-- **-scratch /path/to/scratch/** manually specify the path in which to generate the scratch directory.
+- **-scratch /path/to/scratch/** manually specify an existing directory in which to generate the scratch directory.
 
 - **-continue ScratchDir LastFile** continue the script from a previous execution; must provide the scratch directory path, and the name of the last successfully-generated file.
 
@@ -1102,19 +1102,19 @@ Usage
 Options
 -------
 
-Options for turning 'dwi2mask trace' into an iterative algorithm
+Options for turning "dwi2mask trace" into an iterative algorithm
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 - **-iterative** (EXPERIMENTAL) Iteratively refine the weights for combination of per-shell trace-weighted images prior to thresholding
 
-- **-max_iters** Set the maximum number of iterations for the algorithm (default: 10)
+- **-max_iters iterations** Set the maximum number of iterations for the algorithm (default: 10)
 
-Options specific to the 'trace' algorithm
+Options specific to the "trace" algorithm
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 - **-shells bvalues** Comma-separated list of shells used to generate trace-weighted images for masking
 
-- **-clean_scale** the maximum scale used to cut bridges. A certain maximum scale cuts bridges up to a width (in voxels) of 2x the provided scale. Setting this to 0 disables the mask cleaning step. (Default: 2)
+- **-clean_scale value** the maximum scale used to cut bridges. A certain maximum scale cuts bridges up to a width (in voxels) of 2x the provided scale. Setting this to 0 disables the mask cleaning step. (Default: 2)
 
 Options for importing the diffusion gradient table
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -1128,7 +1128,7 @@ Additional standard options for Python scripts
 
 - **-nocleanup** do not delete intermediate files during script execution, and do not delete scratch directory at script completion.
 
-- **-scratch /path/to/scratch/** manually specify the path in which to generate the scratch directory.
+- **-scratch /path/to/scratch/** manually specify an existing directory in which to generate the scratch directory.
 
 - **-continue ScratchDir LastFile** continue the script from a previous execution; must provide the scratch directory path, and the name of the last successfully-generated file.
 

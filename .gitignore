@@ -43,19 +43,5 @@ build.*
 .check_syntax2.tmp
 build/
 CMakeLists.txt.user
-*.venv
-/interfaces/pydra/src/pydra/tasks/mrtrix3/*
-_version.py
-version.cpp
-exec_version.cpp
-__pycache__
-.DS_Store
-
-# Pydra related ignores
-
-_version.py
-/interfaces/pydra/src/pydra/tasks/mrtrix3/v3_0
-/interfaces/pydra/**/dist/**
-.pytest_cache
-/build*
-/install
+testing/data/tmp*
+testing/data/*-tmp-*

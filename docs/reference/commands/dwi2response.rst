@@ -15,19 +15,20 @@ Usage
 
     dwi2response algorithm [ options ] ...
 
--  *algorithm*: Select the algorithm to be used to complete the script operation; additional details and options become available once an algorithm is nominated. Options are: dhollander, fa, manual, msmt_5tt, tax, tournier
+-  *algorithm*: Select the algorithm to be used; additional details and options become available once an algorithm is nominated. Options are: dhollander, fa, manual, msmt_5tt, tax, tournier
 
 Description
 -----------
 
-dwi2response offers different algorithms for performing various types of response function estimation. The name of the algorithm must appear as the first argument on the command-line after 'dwi2response'. The subsequent arguments and options depend on the particular algorithm being invoked.
+dwi2response offers different algorithms for performing various types of response function estimation. The name of the algorithm must appear as the first argument on the command-line after "dwi2response". The subsequent arguments and options depend on the particular algorithm being invoked.
 
-Each algorithm available has its own help page, including necessary references; e.g. to see the help page of the 'fa' algorithm, type 'dwi2response fa'.
+Each algorithm available has its own help page, including necessary references; e.g. to see the help page of the "fa" algorithm, type "dwi2response fa".
 
 More information on response function estimation for spherical deconvolution can be found at the following link: 
 https://mrtrix.readthedocs.io/en/3.0.4/constrained_spherical_deconvolution/response_function_estimation.html
 
-Note that if the -mask command-line option is not specified, the MRtrix3 command dwi2mask will automatically be called to derive an initial voxel exclusion mask. More information on mask derivation from DWI data can be found at: https://mrtrix.readthedocs.io/en/3.0.4/dwi_preprocessing/masking.html
+Note that if the -mask command-line option is not specified, the MRtrix3 command dwi2mask will automatically be called to derive an initial voxel exclusion mask. More information on mask derivation from DWI data can be found at: 
+https://mrtrix.readthedocs.io/en/3.0.4/dwi_preprocessing/masking.html
 
 Options
 -------
@@ -55,7 +56,7 @@ Additional standard options for Python scripts
 
 - **-nocleanup** do not delete intermediate files during script execution, and do not delete scratch directory at script completion.
 
-- **-scratch /path/to/scratch/** manually specify the path in which to generate the scratch directory.
+- **-scratch /path/to/scratch/** manually specify an existing directory in which to generate the scratch directory.
 
 - **-continue ScratchDir LastFile** continue the script from a previous execution; must provide the scratch directory path, and the name of the last successfully-generated file.
 
@@ -134,10 +135,10 @@ This is an improved version of the Dhollander et al. (2016) algorithm for unsupe
 Options
 -------
 
-Options for the 'dhollander' algorithm
+Options for the "dhollander" algorithm
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-- **-erode passes** Number of erosion passes to apply to initial (whole brain) mask. Set to 0 to not erode the brain mask. (default: 3)
+- **-erode iterations** Number of erosion passes to apply to initial (whole brain) mask. Set to 0 to not erode the brain mask. (default: 3)
 
 - **-fa threshold** FA threshold for crude WM versus GM-CSF separation. (default: 0.2)
 
@@ -172,7 +173,7 @@ Additional standard options for Python scripts
 
 - **-nocleanup** do not delete intermediate files during script execution, and do not delete scratch directory at script completion.
 
-- **-scratch /path/to/scratch/** manually specify the path in which to generate the scratch directory.
+- **-scratch /path/to/scratch/** manually specify an existing directory in which to generate the scratch directory.
 
 - **-continue ScratchDir LastFile** continue the script from a previous execution; must provide the scratch directory path, and the name of the last successfully-generated file.
 
@@ -248,10 +249,10 @@ Usage
 Options
 -------
 
-Options specific to the 'fa' algorithm
+Options specific to the "fa" algorithm
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-- **-erode passes** Number of brain mask erosion steps to apply prior to threshold (not used if mask is provided manually)
+- **-erode iterations** Number of brain mask erosion steps to apply prior to threshold (not used if mask is provided manually)
 
 - **-number voxels** The number of highest-FA voxels to use
 
@@ -280,7 +281,7 @@ Additional standard options for Python scripts
 
 - **-nocleanup** do not delete intermediate files during script execution, and do not delete scratch directory at script completion.
 
-- **-scratch /path/to/scratch/** manually specify the path in which to generate the scratch directory.
+- **-scratch /path/to/scratch/** manually specify an existing directory in which to generate the scratch directory.
 
 - **-continue ScratchDir LastFile** continue the script from a previous execution; must provide the scratch directory path, and the name of the last successfully-generated file.
 
@@ -355,7 +356,7 @@ Usage
 Options
 -------
 
-Options specific to the 'manual' algorithm
+Options specific to the "manual" algorithm
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 - **-dirs image** Provide an input image that contains a pre-estimated fibre direction in each voxel (a tensor fit will be used otherwise)
@@ -383,7 +384,7 @@ Additional standard options for Python scripts
 
 - **-nocleanup** do not delete intermediate files during script execution, and do not delete scratch directory at script completion.
 
-- **-scratch /path/to/scratch/** manually specify the path in which to generate the scratch directory.
+- **-scratch /path/to/scratch/** manually specify an existing directory in which to generate the scratch directory.
 
 - **-continue ScratchDir LastFile** continue the script from a previous execution; must provide the scratch directory path, and the name of the last successfully-generated file.
 
@@ -458,7 +459,7 @@ Usage
 Options
 -------
 
-Options specific to the 'msmt_5tt' algorithm
+Options specific to the "msmt_5tt" algorithm
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 - **-dirs image** Provide an input image that contains a pre-estimated fibre direction in each voxel (a tensor fit will be used otherwise)
@@ -494,7 +495,7 @@ Additional standard options for Python scripts
 
 - **-nocleanup** do not delete intermediate files during script execution, and do not delete scratch directory at script completion.
 
-- **-scratch /path/to/scratch/** manually specify the path in which to generate the scratch directory.
+- **-scratch /path/to/scratch/** manually specify an existing directory in which to generate the scratch directory.
 
 - **-continue ScratchDir LastFile** continue the script from a previous execution; must provide the scratch directory path, and the name of the last successfully-generated file.
 
@@ -568,7 +569,7 @@ Usage
 Options
 -------
 
-Options specific to the 'tax' algorithm
+Options specific to the "tax" algorithm
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 - **-peak_ratio value** Second-to-first-peak amplitude ratio threshold
@@ -600,7 +601,7 @@ Additional standard options for Python scripts
 
 - **-nocleanup** do not delete intermediate files during script execution, and do not delete scratch directory at script completion.
 
-- **-scratch /path/to/scratch/** manually specify the path in which to generate the scratch directory.
+- **-scratch /path/to/scratch/** manually specify an existing directory in which to generate the scratch directory.
 
 - **-continue ScratchDir LastFile** continue the script from a previous execution; must provide the scratch directory path, and the name of the last successfully-generated file.
 
@@ -674,14 +675,14 @@ Usage
 Options
 -------
 
-Options specific to the 'tournier' algorithm
+Options specific to the "tournier" algorithm
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 - **-number voxels** Number of single-fibre voxels to use when calculating response function
 
 - **-iter_voxels voxels** Number of single-fibre voxels to select when preparing for the next iteration (default = 10 x value given in -number)
 
-- **-dilate passes** Number of mask dilation steps to apply when deriving voxel mask to test in the next iteration
+- **-dilate iterations** Number of mask dilation steps to apply when deriving voxel mask to test in the next iteration
 
 - **-max_iters iterations** Maximum number of iterations (set to 0 to force convergence)
 
@@ -708,7 +709,7 @@ Additional standard options for Python scripts
 
 - **-nocleanup** do not delete intermediate files during script execution, and do not delete scratch directory at script completion.
 
-- **-scratch /path/to/scratch/** manually specify the path in which to generate the scratch directory.
+- **-scratch /path/to/scratch/** manually specify an existing directory in which to generate the scratch directory.
 
 - **-continue ScratchDir LastFile** continue the script from a previous execution; must provide the scratch directory path, and the name of the last successfully-generated file.
 
