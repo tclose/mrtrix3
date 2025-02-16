@@ -16,6 +16,7 @@
 import argparse, importlib, inspect, math, os, pathlib, random, shlex, shutil, signal, string, subprocess, sys, textwrap, time
 from mrtrix3 import ANSI, CONFIG, MRtrixError, setup_ansi
 from mrtrix3 import utils, version
+import re
 import typing as ty
 from keyword import kwlist as PYTHON_KEYWORDS
 try:
@@ -775,6 +776,19 @@ class Parser(argparse.ArgumentParser):
     def _metavar():
       return 'directory'
 
+  # Would you mind if this is defined here instead of in commands.population_template.usage
+  # makes it much easiery to import and include in instance checks for pydra auto-gen??
+  class SequenceDirectoryOut(CustomTypeBase):
+    def __call__(self, input_value):
+      return [Parser.make_userpath_object(Parser._UserDirOutPathExtras, item) # pylint: disable=protected-access \
+              for item in input_value.split(',')]
+    @staticmethod
+    def _legacytypestring():
+      return 'SEQDIROUT'
+    @staticmethod
+    def _metavar():
+      return 'directory_list'    
+
   class FileIn(CustomTypeBase):
     def __call__(self, input_value):
       abspath = Parser.make_userpath_object(Parser._UserPathExtras, input_value)
@@ -1533,6 +1547,8 @@ class Parser(argparse.ArgumentParser):
         type_str = "Directory"
       elif isinstance(type_, Parser.DirectoryOut):
         type_str = "Directory"
+      elif isinstance(type_, Parser.SequenceDirectoryOut):
+        type_str = "typing.List[Directory]"
       elif isinstance(type_, Parser.ImageIn):
         type_str = "ImageIn"
       elif isinstance(type_, Parser.ImageOut):
@@ -1569,6 +1585,12 @@ class Parser(argparse.ArgumentParser):
           return tuple(group[0])
       return None
 
+    def is_output(arg_option) -> bool:
+      tp = arg_option.type
+      if isinstance(tp, (Parser.FileOut, Parser.DirectoryOut, Parser.ImageOut, Parser.SequenceDirectoryOut)):
+        return True
+      return hasattr(tp, "_legacytypestring") and tp._legacytypestring().endswith("OUT")
+
     inputs = []
     outputs = []
     input_names = [a.dest for a in self._positionals._group_actions]
@@ -1582,7 +1604,7 @@ class Parser(argparse.ArgumentParser):
         kwds["allowed_values"] = list(arg.choices)
       arg_id = escape_id(arg.dest)
       type_ = parse_type(arg.type)
-      if isinstance(arg.type, (Parser.FileOut, Parser.DirectoryOut, Parser.ImageOut)):
+      if is_output(arg):
         if isinstance(arg.type, Parser.ImageOut):
           ext = ".mif"
         elif isinstance(arg.type, Parser.FileOut):
@@ -1590,10 +1612,7 @@ class Parser(argparse.ArgumentParser):
         else:
           ext = ""
         kwds["path_template"] = arg_id + ext
-        is_output = True
-      else:
-        is_output = False
-      (outputs if is_output else inputs).append(
+      (outputs if is_output(arg) else inputs).append(
         (
           arg_id,
           type_,
@@ -1602,10 +1621,6 @@ class Parser(argparse.ArgumentParser):
       )
     for group in reversed(self._action_groups):
       for option in group._group_actions:
-        is_output = isinstance(
-          option.type,
-          (Parser.FileOut, Parser.DirectoryOut, Parser.ImageOut)
-        )
         if option.dest in input_names:
           continue
         if isinstance(option, argparse._StoreTrueAction):
@@ -1614,7 +1629,7 @@ class Parser(argparse.ArgumentParser):
         else:
           type_ = parse_type(option.type, optional=True)
         if isinstance(option, argparse._AppendAction):
-          if is_output:
+          if is_output(option):
             type_ = "list"
           else:
             type_ = "MultiInputObj"
@@ -1628,7 +1643,7 @@ class Parser(argparse.ArgumentParser):
           kwds["default"] = False
         else:
           kwds["default"] = None
-        if is_output:
+        if is_output(option):
           if isinstance(option.type, Parser.ImageOut):
             ext = ".mif"
           elif isinstance(option.type, Parser.FileOut):
@@ -1636,7 +1651,7 @@ class Parser(argparse.ArgumentParser):
           else:
             ext = ""
           kwds["path_template"] = escape_id(option.dest) + ext
-        (outputs if is_output else inputs).append(
+        (outputs if is_output(option) else inputs).append(
           (
             escape_id(option.dest),
             type_,
