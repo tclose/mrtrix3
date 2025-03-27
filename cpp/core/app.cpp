@@ -904,8 +904,7 @@ std::string pydra_usage() {
   s += "from pathlib import Path  # noqa: F401\n";
   s += "from fileformats.generic import File, Directory  # noqa: F401\n";
   s += "from fileformats.medimage_mrtrix3 import ImageIn, ImageOut, Tracks  # noqa: F401\n";
-  s += "from pydra.design import shell\n";
-  s += "from pydra.engine import specs\n";
+  s += "from pydra.compose import shell\n";
   s += "from pydra.utils.typing import MultiInputObj\n";
 
   auto escape_id = [&](const std::string &id) {
@@ -1143,7 +1142,7 @@ std::string pydra_usage() {
   };
 
   // Create actual class
-  s += "\n\n@shell.define\nclass " + name_string + "(specs.ShellDef[\"" + name_string + ".Outputs\"]):\n";
+  s += "\n\n@shell.define\nclass " + name_string + "(shell.Task[\"" + name_string + ".Outputs\"]):\n";
   s += "    \"\"\"";
   // Add description
   if (DESCRIPTION.size()) {
@@ -1211,7 +1210,7 @@ std::string pydra_usage() {
     if (__standard_options[i].id != str("help") && __standard_options[i].id != str("version"))
       s += format_option(__standard_options[i]);
 
-  s += "\n" + base_indent + "class Outputs(specs.ShellOutputs):\n";
+  s += "\n" + base_indent + "class Outputs(shell.Outputs):\n";
 
   // Add an additional indent
   base_indent += "    ";

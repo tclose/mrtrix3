@@ -2812,11 +2812,10 @@ class Parser(argparse.ArgumentParser):
         "from fileformats.generic import FsObject, File, Directory  # noqa: F401\n"
         "from fileformats.medimage_mrtrix3 import Tracks, ImageIn, ImageOut  # noqa: F401\n"
         "from pydra.utils.typing import MultiInputObj\n"
-        "from pydra.design import shell\n"
-        "from pydra.engine import specs\n"
+        "from pydra.compose import shell\n"
     )
 
-    text += f"\n\n@shell.define{xor_str}\nclass {task_name}(specs.ShellDef[\"{task_name}.Outputs\"]):\n"
+    text += f"\n\n@shell.define{xor_str}\nclass {task_name}(shell.Task[\"{task_name}.Outputs\"]):\n"
     indent = "    "
     text += indent + "\"\"\"\n"
     text += indent + (self.description if self.description else "").replace("\n", "\n    ") + "\n"
@@ -2840,7 +2839,7 @@ class Parser(argparse.ArgumentParser):
     text += f"    executable={executable!r}\n\n"
     text += inputs_str
     if outputs_str:
-      text += f"\n\n{indent}class Outputs(specs.ShellOutputs):\n"
+      text += f"\n\n{indent}class Outputs(shell.Outputs):\n"
       text += outputs_str
 
     if HAVE_BLACK:
