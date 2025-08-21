@@ -1086,14 +1086,16 @@ std::string pydra_usage() {
 
   auto format_choices = [&](const Argument &arg) {
     std::string f = indent + "allowed_values=[";
-    std::vector<std::string> choices = std::get<std::vector<std::string>>(arg.limits);
+    const char* const* choices = arg.limits.choices;
     f += "\"" + choices[0] + "\"";
-    for (int i = 1; i < choices.size(); ++i) {
+    for (int i = 1; choices[i]; ++i) {
       f += ", \"" + choices[i] + "\"";
     }
     f += "],\n";
     return f;
+    
   };
+
 
   auto format_output_template = [&](const std::string &id, const ArgType &type) {
     std::string tmpl(id);
