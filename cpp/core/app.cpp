@@ -814,6 +814,7 @@ std::string restructured_text_usage() {
   return s;
 }
 
+// Generate interface code to wrap a MRtrix3 command in a Pydra task (https://nipype.github.io/pydra/)
 static std::string pydra_code() {
 
   constexpr std::array<std::string_view, 23> CMD_PREFIXES = {
